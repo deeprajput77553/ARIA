@@ -123,7 +123,7 @@ const WelcomeScreen = ({ onComplete }) => {
           <span className="ws-sep">·</span>
           <span>Reasoning</span>
           <span className="ws-sep">·</span>
-          <span>and Integration</span>
+          <span>Integration</span>
           <span className="ws-sep">·</span>
           <span>Agent</span>
         </div>
