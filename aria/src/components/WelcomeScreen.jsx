@@ -117,16 +117,17 @@ const WelcomeScreen = ({ onComplete }) => {
           </g>
         </svg>
 
-        {/* Tagline */}
+        {/* Tagline — full acronym */}
         <div className="ws-tagline">
-          <span>Adaptive</span>
+          <span>Autonomous</span>
           <span className="ws-sep">·</span>
-          <span>Responsive</span>
+          <span>Reasoning</span>
           <span className="ws-sep">·</span>
-          <span>Intelligent</span>
+          <span>and Integration</span>
           <span className="ws-sep">·</span>
           <span>Agent</span>
         </div>
+        <div className="ws-sub-tagline">A.R.I.A — Your Cognitive Operating System</div>
       </div>
 
       <style>{`
@@ -207,6 +208,14 @@ const WelcomeScreen = ({ onComplete }) => {
         }
         .ws-tagline span { color: rgba(255,255,255,0.55); }
         .ws-sep { color: rgba(168,85,247,0.6); }
+        .ws-sub-tagline {
+          margin-top: 6px;
+          font-family: 'Inter', system-ui, sans-serif;
+          font-size: clamp(9px, 1.2vw, 12px);
+          font-weight: 400; letter-spacing: 0.14em;
+          color: rgba(255,255,255,0.22);
+          animation: tag-enter 1.4s 1s cubic-bezier(0.16,1,0.3,1) both;
+        }
       `}</style>
     </div>
   );

@@ -20,10 +20,10 @@ function App() {
   if (screen === 'auth')    return <AuthPage mode={authMode} onSwitch={() => setAuthMode(m=>m==='signin'?'signup':'signin')}/>;
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" style={{ display: 'flex', flexDirection: 'row' }}>
       <Navbar currentPage={screen} onNavigate={navigate}/>
       <main className="app-main">
-        {screen === 'orb'      && <Orb/>}
+        {screen === 'orb'      && <Orb onNavigate={navigate}/>}
         {screen === 'chat'     && <DNAChat/>}
         {screen === 'settings' && <SettingsPage/>}
       </main>

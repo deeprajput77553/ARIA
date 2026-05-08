@@ -207,7 +207,7 @@ const useOllama = () => {
 };
 
 // ─── ORB COMPONENT ─────────────────────────────────────────────────────────
-const Orb = ({ onStateChange }) => {
+const Orb = ({ onStateChange, onNavigate }) => {
   const mountRef = useRef(null);
   const orbState = useRef(0); // 0=idle, 1=listen, 2=speak
   const uniformsRef = useRef(null);
@@ -499,6 +499,17 @@ const Orb = ({ onStateChange }) => {
           <p>{response || '...'}</p>
         </div>
       )}
+
+      {/* Floating circle button to Logs */}
+      <button
+        className="orb-logs-btn"
+        onClick={() => onNavigate && onNavigate('chat')}
+        title="View Logs"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="18" height="18">
+          <path d="M12 20h9M3 20h2M3 12h18M3 4h18" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
     </div>
   );
 };
