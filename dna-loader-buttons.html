@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>DNA Loader v5</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{
+  width:100%;height:100%;
+  background:#08080f;
+  display:flex;align-items:center;justify-content:center;
+  gap:32px;
+  flex-wrap:wrap;
+}
+
+/* ── reusable button styles ── */
+.btn{
+  display:inline-flex;align-items:center;gap:10px;
+  padding:0 18px;
+  height:44px;
+  border-radius:10px;
+  border:1px solid rgba(79,172,254,0.22);
+  background:rgba(79,172,254,0.06);
+  cursor:pointer;
+  font-family:'Space Mono',monospace;
+  font-size:11px;
+  letter-spacing:0.18em;
+  text-transform:uppercase;
+  color:rgba(255,255,255,0.55);
+  transition:border-color 0.2s, background 0.2s;
+}
+.btn:hover{
+  border-color:rgba(79,172,254,0.45);
+  background:rgba(79,172,254,0.12);
+}
+
+/* icon-only pill */
+.btn-icon{
+  width:44px;height:44px;
+  padding:0;
+  border-radius:50%;
+  justify-content:center;
+}
+
+/* large pill variant */
+.btn-lg{
+  height:52px;
+  padding:0 24px;
+  border-radius:14px;
+  font-size:12px;
+  gap:12px;
+}
+
+/* small chip variant */
+.btn-sm{
+  height:32px;
+  padding:0 12px;
+  border-radius:8px;
+  font-size:9px;
+  gap:7px;
+}
+</style>
+</head>
+<body>
+
+<!-- icon only -->
+<button class="btn btn-icon"><canvas id="c1"></canvas></button>
+
+<!-- small chip -->
+<button class="btn btn-sm">
+  <canvas id="c2"></canvas>
+  <span>thinking</span>
+</button>
+
+<!-- default button -->
+<button class="btn">
+  <canvas id="c3"></canvas>
+  <span>generating</span>
+</button>
+
+<!-- large pill -->
+<button class="btn btn-lg">
+  <canvas id="c4"></canvas>
+  <span>analysing dna</span>
+</button>
+
+<script>
+const DPR = Math.min(window.devicePixelRatio||1, 2);
+
+// palette
+const CA_FRONT='#4facfe', CA_BACK='#071828';
+const CB_FRONT='#f64f59', CB_BACK='#1e0008';
+const SCOLS=[
+  {r:79, g:172,b:254},
+  {r:0,  g:242,b:195},
+  {r:255,g:201,b:60 },
+  {r:246,g:79, b:89 },
+  {r:167,g:139,b:250},
+];
+
+let globalTime=0, globalPhi=0, globalLast=null;
+
+function speed(t){
+  const s=Math.sin(t*2.2);
+  return 0.30+7.0*Math.pow(Math.max(0,s),2.6);
+}
+
+/* ── build one loader instance ── */
+function DNALoader(canvas, S){
+  canvas.width  = S*DPR;
+  canvas.height = S*DPR;
+  canvas.style.width  = S+'px';
+  canvas.style.height = S+'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(DPR,DPR);
+
+  const CX    = S/2, CY = S/2;
+  const VSPAN = S*0.82;
+  const TOP   = CY - VSPAN/2;
+  const AMP   = S*0.22;   // horizontal swing
+  const SW    = S*0.10;   // strand width — thicker so it's visible small
+  const RW    = S*0.10;   // rung sphere radius base
+  const STEPS = 200;
+  const TURNS = 1;
+  const RUNGS = 5;
+
+  return { ctx, S, CX, CY, VSPAN, TOP, AMP, SW, RW, STEPS, TURNS, RUNGS };
+}
+
+function sphere(ctx, x, y, R, col, alpha){
+  const{r,g,b}=col;
+
+  // glow
+  const glow=ctx.createRadialGradient(x,y,0,x,y,R*2.8);
+  glow.addColorStop(0,`rgba(${r},${g},${b},${alpha*0.35})`);
+  glow.addColorStop(1,`rgba(${r},${g},${b},0)`);
+  ctx.save();ctx.globalAlpha=1;
+  ctx.beginPath();ctx.arc(x,y,R*2.8,0,Math.PI*2);
+  ctx.fillStyle=glow;ctx.fill();ctx.restore();
+
+  // body
+  const gr=ctx.createRadialGradient(x-R*0.38,y-R*0.38,R*0.01,x+R*0.15,y+R*0.18,R*1.1);
+  gr.addColorStop(0.00,'rgba(255,255,255,1)');
+  gr.addColorStop(0.12,`rgba(${Math.min(r+100,255)},${Math.min(g+100,255)},${Math.min(b+100,255)},1)`);
+  gr.addColorStop(0.45,`rgba(${r},${g},${b},1)`);
+  gr.addColorStop(0.82,`rgba(${Math.max(r-60,0)},${Math.max(g-60,0)},${Math.max(b-60,0)},1)`);
+  gr.addColorStop(1.00,'rgba(0,0,0,0.85)');
+  ctx.save();ctx.globalAlpha=alpha;
+  ctx.beginPath();ctx.arc(x,y,R,0,Math.PI*2);
+  ctx.fillStyle=gr;ctx.fill();ctx.restore();
+
+  // rim light
+  const rim=ctx.createRadialGradient(x+R*0.48,y+R*0.50,0,x+R*0.48,y+R*0.50,R*0.72);
+  rim.addColorStop(0,`rgba(180,230,255,0.55)`);
+  rim.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.save();ctx.globalAlpha=alpha;
+  ctx.beginPath();ctx.arc(x,y,R,0,Math.PI*2);
+  ctx.fillStyle=rim;ctx.fill();ctx.restore();
+
+  // specular
+  const sp=ctx.createRadialGradient(x-R*0.30,y-R*0.32,0,x-R*0.22,y-R*0.22,R*0.36);
+  sp.addColorStop(0,'rgba(255,255,255,1)');
+  sp.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.save();ctx.globalAlpha=alpha;
+  ctx.beginPath();ctx.arc(x,y,R,0,Math.PI*2);
+  ctx.fillStyle=sp;ctx.fill();ctx.restore();
+}
+
+function drawLoader(inst, phi){
+  const{ctx,S,CX,CY,VSPAN,TOP,AMP,SW,RW,STEPS,TURNS,RUNGS}=inst;
+
+  // fade with trail
+  const spd=speed(globalTime);
+  const fade=0.50+0.28*(spd/7.5);
+  ctx.fillStyle=`rgba(8,8,15,${fade})`;
+  ctx.fillRect(0,0,S,S);
+
+  ctx.save();
+  ctx.translate(CX,CY);
+  ctx.rotate(Math.PI/4); // 45°
+  ctx.translate(-CX,-CY);
+
+  function pts(phase){
+    const a=[];
+    for(let i=0;i<=STEPS;i++){
+      const f=i/STEPS;
+      const t=phi+phase+f*Math.PI*2*TURNS;
+      a.push({x:CX+Math.cos(t)*AMP, y:TOP+f*VSPAN, depth:(Math.sin(t)+1)/2});
+    }
+    return a;
+  }
+  const pA=pts(0), pB=pts(Math.PI);
+
+  // rung positions — placed at exact strand X so they're always connected
+  const rungData=[];
+  for(let ri=0;ri<RUNGS;ri++){
+    const f=ri/(RUNGS-1);
+    const idx=Math.round(f*STEPS);
+    const d=(pA[idx].depth+pB[idx].depth)/2;
+    rungData.push({ri,d,
+      xA:pA[idx].x, yA:pA[idx].y,
+      xB:pB[idx].x, yB:pB[idx].y});
+  }
+
+  // depth-sorted draw list
+  const dl=[];
+  for(let i=0;i<STEPS;i++){
+    dl.push({k:'sA',i,d:(pA[i].depth+pA[i+1].depth)/2});
+    dl.push({k:'sB',i,d:(pB[i].depth+pB[i+1].depth)/2});
+  }
+  for(const rd of rungData){
+    dl.push({k:'bar',d:rd.d-0.01,rd});
+    dl.push({k:'spA',d:rd.d+0.001,rd});
+    dl.push({k:'spB',d:rd.d+0.001,rd});
+  }
+  dl.sort((a,b)=>a.d-b.d);
+
+  for(const it of dl){
+    if(it.k==='sA'||it.k==='sB'){
+      const p=it.k==='sA'?pA:pB;
+      const cF=it.k==='sA'?CA_FRONT:CB_FRONT;
+      const cB=it.k==='sA'?CA_BACK:CB_BACK;
+      const d=it.d, i=it.i;
+      ctx.save();
+      ctx.globalAlpha=0.28+d*0.72;
+      ctx.beginPath();
+      ctx.moveTo(p[i].x,p[i].y);
+      ctx.lineTo(p[i+1].x,p[i+1].y);
+      ctx.strokeStyle=d>0.5?cF:cB;
+      ctx.lineWidth=SW*(0.30+d*0.70);
+      ctx.lineCap='round';ctx.lineJoin='round';
+      ctx.stroke();ctx.restore();
+
+    } else if(it.k==='bar'){
+      // connecting rod between spheres — visible & bright
+      const{xA,yA,xB,yB,d,ri}=it.rd;
+      const c=SCOLS[ri%SCOLS.length];
+      const gr=ctx.createLinearGradient(xA,yA,xB,yB);
+      gr.addColorStop(0,  `rgba(${c.r},${c.g},${c.b},${0.55+d*0.35})`);
+      gr.addColorStop(0.5,`rgba(255,255,255,${0.40+d*0.40})`);
+      gr.addColorStop(1,  `rgba(${c.r},${c.g},${c.b},${0.55+d*0.35})`);
+      ctx.save();
+      ctx.globalAlpha=0.70+d*0.30;
+      ctx.beginPath();ctx.moveTo(xA,yA);ctx.lineTo(xB,yB);
+      ctx.strokeStyle=gr;
+      ctx.lineWidth=SW*0.22;
+      ctx.lineCap='round';
+      ctx.stroke();ctx.restore();
+
+    } else {
+      // 3D sphere at each rung end
+      const{xA,yA,xB,yB,d,ri}=it.rd;
+      const c=SCOLS[ri%SCOLS.length];
+      const R=RW*(0.55+d*0.45);
+      const al=0.60+d*0.40;
+      const x=it.k==='spA'?xA:xB;
+      const y=it.k==='spA'?yA:yB;
+      sphere(ctx,x,y,R,c,al);
+    }
+  }
+
+  ctx.restore();
+}
+
+// build all instances
+const instances=[
+  DNALoader(document.getElementById('c1'), 24),
+  DNALoader(document.getElementById('c2'), 18),
+  DNALoader(document.getElementById('c3'), 22),
+  DNALoader(document.getElementById('c4'), 28),
+];
+
+function frame(ts){
+  if(globalLast===null) globalLast=ts;
+  const dt=Math.min((ts-globalLast)/1000,0.05);
+  globalLast=ts;
+  globalTime+=dt;
+  const spd=speed(globalTime);
+  globalPhi+=dt*Math.PI*2*(18/60)*spd;
+
+  for(const inst of instances) drawLoader(inst, globalPhi);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

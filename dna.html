@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>DNA — Double Helix</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html,body{
+  width:100%;height:100%;overflow:hidden;
+  background:#f5f0eb;
+  display:flex;align-items:center;justify-content:center;
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size:180px;opacity:.028;mix-blend-mode:multiply;
+}
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 72% 72% at 50% 50%,transparent 40%,rgba(28,14,4,.11) 100%);
+}
+.halo{position:fixed;z-index:0;pointer-events:none;border-radius:50%;filter:blur(100px);}
+.halo.h1{width:560px;height:560px;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:radial-gradient(circle,rgba(0,116,184,.10) 0%,transparent 70%);}
+.halo.h2{width:380px;height:380px;top:70%;left:24%;
+  background:radial-gradient(circle,rgba(192,0,60,.075) 0%,transparent 70%);}
+.halo.h3{width:300px;height:300px;top:16%;left:68%;
+  background:radial-gradient(circle,rgba(168,90,0,.055) 0%,transparent 70%);}
+canvas{position:relative;z-index:1;display:block;}
+</style>
+</head>
+<body>
+<div class="halo h1"></div>
+<div class="halo h2"></div>
+<div class="halo h3"></div>
+<canvas id="helix"></canvas>
+<script>
+/* ── CANVAS ── */
+const cv  = document.getElementById('helix');
+const ctx = cv.getContext('2d');
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+const CW = 260, CH = 600;
+cv.width  = CW * DPR;
+cv.height = CH * DPR;
+cv.style.width  = CW + 'px';
+cv.style.height = CH + 'px';
+ctx.scale(DPR, DPR);
+const CX = CW / 2;
+
+/* ── CONFIG ── */
+const N       = 34;          // more nodes = silkier curves
+const GAP     = CH / (N-1);
+const RAD     = 82;
+const RPM     = 8;            // frame-rate independent speed
+const TW      = 9.5;         // tube half-width at front
+const TW_BACK = TW * 0.32;   // tube half-width at back
+const SM_MAX  = 7.5;
+const SM_MIN  = 2.5;
+const BW      = 4.2;
+
+const COL_A = [0,   116, 184];
+const COL_B = [192,   0,  60];
+
+let phi     = 0;
+let last    = null;
+let breathT = 0;
+
+/* ── MATH ── */
+const lerp  = (a,b,t) => a + (b-a)*t;
+const clamp = (v,a,b) => Math.max(a, Math.min(b,v));
+
+// quintic smooth-step: zero 1st & 2nd derivatives at edges → no pop
+const smooth5 = t => {
+  t = clamp(t,0,1);
+  return t*t*t*(t*(t*6-15)+10);
+};
+
+/* ── TUBE with arc end-caps ── */
+function tubeFill(x1,y1,d1, x2,y2,d2, rgb) {
+  const [r,gc,b] = rgb;
+  const w1  = lerp(TW_BACK, TW, d1);
+  const w2  = lerp(TW_BACK, TW, d2);
+  const dx  = x2-x1, dy = y2-y1;
+  const L   = Math.hypot(dx,dy) || 1;
+  const nx  = -dy/L, ny = dx/L;
+
+  const avgD = (d1+d2) * 0.5;
+  const al   = lerp(0.38, 0.90, avgD);
+  const wMax = Math.max(w1, w2);
+  const mx   = (x1+x2)/2, my = (y1+y2)/2;
+
+  const gr = ctx.createLinearGradient(
+    mx + nx*wMax*1.35, my + ny*wMax*1.35,
+    mx - nx*wMax*1.35, my - ny*wMax*1.35
+  );
+  gr.addColorStop(0,    `rgba(${r},${gc},${b},${al*0.10})`);
+  gr.addColorStop(0.18, `rgba(${r},${gc},${b},${al*0.55})`);
+  gr.addColorStop(0.42, `rgba(${r},${gc},${b},${al})`);
+  gr.addColorStop(0.56, `rgba(255,255,255,${al*0.70})`);
+  gr.addColorStop(0.70, `rgba(${r},${gc},${b},${al})`);
+  gr.addColorStop(0.88, `rgba(${r},${gc},${b},${al*0.50})`);
+  gr.addColorStop(1,    `rgba(${r},${gc},${b},${al*0.08})`);
+
+  ctx.save();
+
+  // stadium-shaped path: arc cap at each end
+  ctx.beginPath();
+  const a1 = Math.atan2(ny, nx);
+  ctx.arc(x1, y1, w1, a1, a1+Math.PI, false);
+  const a2 = Math.atan2(-ny, -nx);
+  ctx.arc(x2, y2, w2, a2, a2+Math.PI, false);
+  ctx.closePath();
+
+  ctx.fillStyle = gr;
+  ctx.fill();
+  ctx.strokeStyle = `rgba(255,255,255,${0.18+avgD*0.24})`;
+  ctx.lineWidth   = 0.6;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/* ── SPHERE ── */
+function drawSphere(x,y,depth,rgb) {
+  const [r,gc,b] = rgb;
+  const rad = lerp(SM_MIN, SM_MAX, depth);
+  const al  = lerp(0.42, 0.96, depth);
+
+  ctx.save();
+
+  if (depth > 0.25) {
+    ctx.shadowColor   = `rgba(${r},${gc},${b},${depth*0.20})`;
+    ctx.shadowBlur    = rad * 1.8;
+    ctx.shadowOffsetY = rad * 0.28;
+  }
+
+  const lg = ctx.createRadialGradient(
+    x-rad*0.34, y-rad*0.38, rad*0.02,
+    x+rad*0.06, y+rad*0.10, rad*1.10
+  );
+  lg.addColorStop(0,    `rgba(255,255,255,${0.84+depth*0.12})`);
+  lg.addColorStop(0.16, `rgba(${Math.min(r+60,255)},${Math.min(gc+60,255)},${Math.min(b+60,255)},${al})`);
+  lg.addColorStop(0.55, `rgba(${r},${gc},${b},${al})`);
+  lg.addColorStop(0.85, `rgba(${Math.max(r-40,0)},${Math.max(gc-40,0)},${Math.max(b-40,0)},${al*0.75})`);
+  lg.addColorStop(1,    `rgba(${Math.max(r-60,0)},${Math.max(gc-60,0)},${Math.max(b-60,0)},${al*0.38})`);
+
+  ctx.beginPath();
+  ctx.arc(x,y,rad,0,Math.PI*2);
+  ctx.fillStyle = lg;
+  ctx.fill();
+
+  ctx.shadowColor = 'transparent';
+
+  ctx.strokeStyle = `rgba(255,255,255,${0.30+depth*0.28})`;
+  ctx.lineWidth   = 1.4;
+  ctx.stroke();
+
+  const sg = ctx.createRadialGradient(x-rad*0.30,y-rad*0.36,0, x-rad*0.26,y-rad*0.30,rad*0.30);
+  sg.addColorStop(0, 'rgba(255,255,255,0.90)');
+  sg.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.beginPath();
+  ctx.arc(x-rad*0.26, y-rad*0.30, rad*0.28, 0, Math.PI*2);
+  ctx.fillStyle = sg;
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/* ── BRIDGE ── */
+function drawBridge(xA,yA,xB,yB,dA,dB) {
+  const avgD = (dA+dB) * 0.5;
+  const dx = xB-xA, dy = yB-yA, L = Math.hypot(dx,dy)||1;
+  const nx = -dy/L, ny = dx/L;
+  const hw = BW * lerp(0.45, 1.0, avgD);
+  const al = lerp(0.28, 0.68, avgD);
+
+  const P = [
+    {x:xA+nx*hw, y:yA+ny*hw},
+    {x:xA-nx*hw, y:yA-ny*hw},
+    {x:xB-nx*hw, y:yB-ny*hw},
+    {x:xB+nx*hw, y:yB+ny*hw}
+  ];
+
+  const bGrad = ctx.createLinearGradient(xA,yA,xB,yB);
+  bGrad.addColorStop(0,    `rgba(0,116,184,${al})`);
+  bGrad.addColorStop(0.38, `rgba(120,190,255,${al*1.1})`);
+  bGrad.addColorStop(0.50, `rgba(230,242,255,${al*0.88})`);
+  bGrad.addColorStop(0.62, `rgba(255,150,185,${al*1.1})`);
+  bGrad.addColorStop(1,    `rgba(192,0,60,${al})`);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(P[0].x,P[0].y);
+  for(let i=1;i<4;i++) ctx.lineTo(P[i].x,P[i].y);
+  ctx.closePath();
+  ctx.fillStyle = bGrad;
+  ctx.fill();
+
+  const sg = ctx.createLinearGradient(P[0].x,P[0].y,P[1].x,P[1].y);
+  sg.addColorStop(0,   'rgba(255,255,255,0)');
+  sg.addColorStop(0.5, `rgba(255,255,255,${0.36+avgD*0.22})`);
+  sg.addColorStop(1,   'rgba(255,255,255,0)');
+  ctx.beginPath();
+  ctx.moveTo(P[0].x,P[0].y); ctx.lineTo(P[3].x,P[3].y);
+  ctx.lineTo(P[3].x-nx*hw, P[3].y-ny*hw);
+  ctx.lineTo(P[0].x-nx*hw, P[0].y-ny*hw);
+  ctx.closePath();
+  ctx.fillStyle = sg;
+  ctx.fill();
+
+  ctx.strokeStyle = `rgba(255,255,255,${0.28+avgD*0.24})`;
+  ctx.lineWidth   = 0.6;
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* ── NODES ── */
+function buildNodes(scale) {
+  const pts = [];
+  for(let i=0; i<N; i++) {
+    const y  = i * GAP;
+    const t  = phi + (i/(N-1)) * Math.PI * 4;
+    const xA = CX + Math.cos(t) * RAD * scale;
+    const xB = CX + Math.cos(t+Math.PI) * RAD * scale;
+    const dA = smooth5((Math.sin(t)+1)/2);
+    const dB = smooth5((Math.sin(t+Math.PI)+1)/2);
+    pts.push({y, xA, xB, dA, dB});
+  }
+  return pts;
+}
+
+/* ── RENDER LOOP ── */
+function draw(ts) {
+  if(last===null) last=ts;
+  const dt = Math.min((ts-last)/1000, 0.05);
+  last = ts;
+
+  phi     += (RPM/60) * Math.PI*2 * dt;
+  breathT += dt * 0.38;
+  const scale = 1 + Math.sin(breathT) * 0.014;
+
+  ctx.clearRect(0,0,CW,CH);
+  const nodes = buildNodes(scale);
+
+  /* pass 1 — tubes back→front */
+  const segs = [];
+  for(let i=0; i<N-1; i++){
+    const n0=nodes[i], n1=nodes[i+1];
+    segs.push({k:'A',i,d:(n0.dA+n1.dA)/2});
+    segs.push({k:'B',i,d:(n0.dB+n1.dB)/2});
+  }
+  segs.sort((a,b)=>a.d-b.d);
+  for(const s of segs){
+    const n0=nodes[s.i], n1=nodes[s.i+1];
+    if(s.k==='A') tubeFill(n0.xA,n0.y,n0.dA, n1.xA,n1.y,n1.dA, COL_A);
+    else          tubeFill(n0.xB,n0.y,n0.dB, n1.xB,n1.y,n1.dB, COL_B);
+  }
+
+  /* pass 2 — bridges + spheres back→front */
+  const items = [];
+  for(let i=0; i<N; i++){
+    const n=nodes[i];
+    items.push({k:'br',i,d:(n.dA+n.dB)/2});
+    items.push({k:'sA',i,d:n.dA});
+    items.push({k:'sB',i,d:n.dB});
+  }
+  items.sort((a,b)=>a.d-b.d);
+  for(const it of items){
+    const n=nodes[it.i];
+    if(it.k==='br')      drawBridge(n.xA,n.y,n.xB,n.y,n.dA,n.dB);
+    else if(it.k==='sA') drawSphere(n.xA,n.y,n.dA,COL_A);
+    else                 drawSphere(n.xB,n.y,n.dB,COL_B);
+  }
+
+  requestAnimationFrame(draw);
+}
+
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>

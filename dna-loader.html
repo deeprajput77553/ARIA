@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>DNA Loader</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{
+  width:100%;height:100%;
+  background:#0a0a0f;
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;
+  gap:10px;
+}
+.hint{
+  font-family:'Courier New',monospace;
+  font-size:10px;
+  letter-spacing:0.2em;
+  color:rgba(255,255,255,0.15);
+  text-transform:uppercase;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<span class="hint">generating</span>
+<script>
+const DPR = Math.min(window.devicePixelRatio||1, 2);
+const S   = 220;
+const cv  = document.getElementById('c');
+cv.width  = S*DPR; cv.height = S*DPR;
+cv.style.width  = S+'px';
+cv.style.height = S+'px';
+const ctx = cv.getContext('2d');
+ctx.scale(DPR, DPR);
+
+const CX    = S/2;
+const CY    = S/2;
+const VSPAN = S*0.76;
+const TOP   = CY - VSPAN/2;
+const AMP   = S*0.21;
+const SW    = S*0.048;
+const STEPS = 320;
+const TURNS = 1;
+const RUNGS = 5;
+
+const CA_FRONT = '#5ab4ff';
+const CA_BACK  = '#0b2840';
+const CB_FRONT = '#ff4d7a';
+const CB_BACK  = '#3d0018';
+
+const SPHERE_COLS = [
+  {r:90,  g:180, b:255},
+  {r:0,   g:220, b:185},
+  {r:255, g:180, b:45 },
+  {r:255, g:75,  b:130},
+  {r:180, g:150, b:255},
+];
+
+// ── trailing glow buffer ──
+// We draw onto an offscreen canvas with slight fade each frame
+// to get motion-blur / comet-tail effect on fast spin
+const ghost = document.createElement('canvas');
+ghost.width  = S*DPR; ghost.height = S*DPR;
+const gCtx   = ghost.getContext('2d');
+gCtx.scale(DPR, DPR);
+
+let phi  = 0;
+let time = 0;
+let last = null;
+
+// Speed curve: sharp cubic pulse
+// Baseline ~18 RPM, spikes to ~70 RPM, creating a clear fast/slow rhythm
+function speed(t) {
+  const s = Math.sin(t * 2.2);
+  const burst = Math.pow(Math.max(0, s), 2.5);
+  return 0.30 + 6.5 * burst;  // 0.30 baseline + burst
+}
+
+// ── sphere draw ──
+function sphere(x, y, R, col, alpha) {
+  const {r,g,b} = col;
+
+  // outer glow
+  const glow = ctx.createRadialGradient(x, y, R*0.5, x, y, R*2.2);
+  glow.addColorStop(0, `rgba(${r},${g},${b},${alpha*0.18})`);
+  glow.addColorStop(1, `rgba(${r},${g},${b},0)`);
+  ctx.save();
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  ctx.arc(x, y, R*2.2, 0, Math.PI*2);
+  ctx.fillStyle = glow;
+  ctx.fill();
+  ctx.restore();
+
+  // body
+  const gr = ctx.createRadialGradient(
+    x - R*0.38, y - R*0.38, R*0.01,
+    x + R*0.18, y + R*0.22, R*1.12
+  );
+  gr.addColorStop(0.00, `rgba(255,255,255,0.98)`);
+  gr.addColorStop(0.10, `rgba(${Math.min(r+90,255)},${Math.min(g+90,255)},${Math.min(b+90,255)},1)`);
+  gr.addColorStop(0.42, `rgba(${r},${g},${b},1)`);
+  gr.addColorStop(0.78, `rgba(${Math.max(r-70,0)},${Math.max(g-70,0)},${Math.max(b-70,0)},1)`);
+  gr.addColorStop(1.00, `rgba(0,0,0,0.85)`);
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.arc(x, y, R, 0, Math.PI*2);
+  ctx.fillStyle = gr;
+  ctx.fill();
+  ctx.restore();
+
+  // rim light
+  const rim = ctx.createRadialGradient(
+    x + R*0.5, y + R*0.52, R*0.05,
+    x + R*0.5, y + R*0.52, R*0.75
+  );
+  rim.addColorStop(0, `rgba(${Math.min(r+60,255)},${Math.min(g+80,255)},255,0.50)`);
+  rim.addColorStop(1, `rgba(0,0,0,0)`);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.arc(x, y, R, 0, Math.PI*2);
+  ctx.fillStyle = rim;
+  ctx.fill();
+  ctx.restore();
+
+  // specular
+  const sp = ctx.createRadialGradient(
+    x - R*0.33, y - R*0.36, 0,
+    x - R*0.25, y - R*0.25, R*0.34
+  );
+  sp.addColorStop(0, 'rgba(255,255,255,0.95)');
+  sp.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.arc(x, y, R, 0, Math.PI*2);
+  ctx.fillStyle = sp;
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawScene() {
+  // build strand points
+  function pts(phase) {
+    const a = [];
+    for(let i=0;i<=STEPS;i++){
+      const f = i/STEPS;
+      const t = phi + phase + f*Math.PI*2*TURNS;
+      a.push({
+        x:     CX + Math.cos(t)*AMP,
+        y:     TOP + f*VSPAN,
+        depth: (Math.sin(t)+1)/2,
+      });
+    }
+    return a;
+  }
+  const pA = pts(0);
+  const pB = pts(Math.PI);
+
+  // rung data
+  const rungData = [];
+  for(let ri=0; ri<RUNGS; ri++){
+    const f   = ri/(RUNGS-1);
+    const idx = Math.round(f*STEPS);
+    const d   = (pA[idx].depth + pB[idx].depth)/2;
+    rungData.push({
+      idx, ri, d,
+      xA:pA[idx].x, yA:pA[idx].y,
+      xB:pB[idx].x, yB:pB[idx].y
+    });
+  }
+
+  // depth-sorted draw list
+  const dl = [];
+  for(let i=0;i<STEPS;i++){
+    dl.push({k:'sA', i, d:(pA[i].depth+pA[i+1].depth)/2});
+    dl.push({k:'sB', i, d:(pB[i].depth+pB[i+1].depth)/2});
+  }
+  for(const rd of rungData){
+    dl.push({k:'bar', d:rd.d - 0.01, rd});
+    dl.push({k:'spA', d:rd.d + 0.002, rd});
+    dl.push({k:'spB', d:rd.d + 0.002, rd});
+  }
+  dl.sort((a,b) => a.d - b.d);
+
+  for(const it of dl){
+    if(it.k==='sA' || it.k==='sB'){
+      const p  = it.k==='sA' ? pA : pB;
+      const cF = it.k==='sA' ? CA_FRONT : CB_FRONT;
+      const cB = it.k==='sA' ? CA_BACK  : CB_BACK;
+      const d  = it.d;
+      const i  = it.i;
+      ctx.save();
+      ctx.globalAlpha = 0.30 + d*0.70;
+      ctx.beginPath();
+      ctx.moveTo(p[i].x, p[i].y);
+      ctx.lineTo(p[i+1].x, p[i+1].y);
+      ctx.strokeStyle = d > 0.5 ? cF : cB;
+      ctx.lineWidth   = SW*(0.36 + d*0.64);
+      ctx.lineCap     = 'round';
+      ctx.lineJoin    = 'round';
+      ctx.stroke();
+      ctx.restore();
+
+    } else if(it.k==='bar'){
+      const {xA,yA,xB,yB,d,ri} = it.rd;
+      const c  = SPHERE_COLS[ri % SPHERE_COLS.length];
+      // gradient bar connecting the two spheres
+      const gr = ctx.createLinearGradient(xA,yA,xB,yB);
+      gr.addColorStop(0,   `rgba(${c.r},${c.g},${c.b},${0.15+d*0.25})`);
+      gr.addColorStop(0.5, `rgba(255,255,255,${0.08+d*0.12})`);
+      gr.addColorStop(1,   `rgba(${c.r},${c.g},${c.b},${0.15+d*0.25})`);
+      ctx.save();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.moveTo(xA,yA);
+      ctx.lineTo(xB,yB);
+      ctx.strokeStyle = gr;
+      ctx.lineWidth   = SW*0.28;
+      ctx.lineCap     = 'round';
+      ctx.stroke();
+      ctx.restore();
+
+    } else {
+      const {xA,yA,xB,yB,d,ri} = it.rd;
+      const c  = SPHERE_COLS[ri % SPHERE_COLS.length];
+      const R  = S*0.058*(0.48 + d*0.52);
+      const al = 0.50 + d*0.50;
+      const x  = it.k==='spA' ? xA : xB;
+      const y  = it.k==='spA' ? yA : yB;
+      sphere(x, y, R, c, al);
+    }
+  }
+}
+
+function frame(ts) {
+  if(last===null) last=ts;
+  const dt  = Math.min((ts-last)/1000, 0.05);
+  last = ts;
+  time += dt;
+
+  const spd = speed(time);
+  phi += dt * Math.PI*2 * (18/60) * spd;
+
+  // ── motion trail: fade ghost buffer then composite ──
+  // faster spin = less fade (more trail), slower = more fade (cleaner)
+  const trailAlpha = 0.08 + 0.18 * (1 - Math.min(spd/7, 1));
+  gCtx.fillStyle = `rgba(10,10,15,${trailAlpha + 0.55})`;
+  gCtx.fillRect(0, 0, S, S);
+
+  // draw fresh scene onto ghost
+  // temporarily redirect ctx drawing to gCtx
+  ctx.clearRect(0, 0, S, S);
+
+  ctx.save();
+  ctx.translate(CX, CY);
+  ctx.rotate(Math.PI / 4);  // 45° tilt
+  ctx.translate(-CX, -CY);
+  drawScene();
+  ctx.restore();
+
+  requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
