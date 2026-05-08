@@ -7,7 +7,6 @@ const DEFAULTS = {
   voiceName: '',           // auto-selected female
   persona: 'friend',
   wakeWord: 'Hey ARIA',
-  storageMode: 'local',    // local | cloud | both
   proactiveMode: true,
   theme: 'dark',
   model: 'llama3.2',
@@ -142,12 +141,8 @@ const SettingsPage = () => {
         </Section>
 
         <Section title="Storage">
-          <Row label="Priority" hint="Local device storage is always used first">
-            <select className="settings-select" value={settings.storageMode} onChange={e => set('storageMode', e.target.value)}>
-              <option value="local">Local only (private, offline)</option>
-              <option value="cloud">Cloud only (MongoDB Atlas)</option>
-              <option value="both">Local + Cloud (sync)</option>
-            </select>
+          <Row label="Data storage" hint="All data is stored privately on this device">
+            <div style={{ color: '#a78bfa', fontSize: '13px', fontWeight: '600' }}>Local Device (Private)</div>
           </Row>
           <Row label="Persistent storage" hint="Ask browser for guaranteed local storage">
             <button className="settings-action-btn" onClick={requestStoragePermission}>Request Permission</button>
