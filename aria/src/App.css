@@ -277,10 +277,18 @@
 }
 @keyframes blink { 50% { opacity: 0; } }
 
-/* ── LOGS PAGE ─────────────────────────────────────── */
+/* ── DNA LOGS PAGE — 3-column grid ────────────────── */
 .dna-chat-page {
-  height: 100%; width: 100%; overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr clamp(180px, 22vw, 300px) 1fr;
+  height: 100%;
+  overflow: hidden;
   background: #07040f;
+}
+@media (max-width: 700px) {
+  .dna-chat-page {
+    grid-template-columns: 1fr clamp(90px, 28vw, 150px) 1fr;
+  }
 }
 
 .dna-center {
@@ -290,14 +298,21 @@
 }
 .dna-canvas { display: block; }
 
-.dna-message-col {
+.dna-message-col,
+.dna-col {
   display: flex; flex-direction: column;
   padding: clamp(12px,2vw,24px) clamp(8px,1.5vw,20px);
   overflow: hidden;
   border-right: 1px solid rgba(255,255,255,0.05);
   gap: 10px;
 }
-.user-col { border-right: none; border-left: 1px solid rgba(255,255,255,0.05); }
+.user-col {
+  border-right: none;
+  border-left: 1px solid rgba(255,255,255,0.05);
+}
+.ai-col {
+  border-right: none;
+}
 
 .col-header {
   display: flex; align-items: center; gap: 8px;
@@ -628,85 +643,59 @@
 }
 .settings-save-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 28px rgba(124,58,237,0.5); }
 
-/* ── LOGS PAGE (Centered) ─────────────────────────── */
-.logs-view {
-  display: flex; justify-content: center; align-items: center;
-  height: 100%; width: 100%; position: relative;
-  background: #07040f; overflow: hidden;
-}
-
-.bg-helix {
-  position: absolute; inset: 0; z-index: 1;
-  opacity: 0.6; pointer-events: none;
-}
-
-.logs-overlay {
-  position: relative; z-index: 10;
-  display: flex; gap: clamp(40px, 15vw, 200px);
-  width: 100%; max-width: 1400px; height: 90%;
-  padding: 0 40px;
-}
-
-.dna-col {
-  flex: 1; display: flex; flex-direction: column; gap: 16px;
-  background: rgba(13, 8, 30, 0.4);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 24px; padding: 24px;
-  max-width: 480px;
-}
-
-.user-col { border-left: 3px solid #f472b6; }
-.ai-col   { border-right: 3px solid #38bdf8; }
-
-.col-header {
-  display: flex; align-items: center; gap: 12px;
-  font-size: 13px; font-weight: 700; letter-spacing: 0.1em;
-  text-transform: uppercase; color: rgba(255,255,255,0.5);
-  padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.08);
-}
-
-.message-list {
-  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
-  padding-right: 8px;
-}
-.message-list::-webkit-scrollbar { width: 4px; }
-.message-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
-
 /* ── LOG ENTRIES ───────────────────────────────────── */
 .log-entry {
   animation: msg-in 0.4s cubic-bezier(0.16,1,0.3,1) both;
   animation-delay: var(--delay,0s);
 }
-@keyframes msg-in {
-  from { opacity:0; transform:translateY(10px); }
-  to   { opacity:1; transform:translateY(0); }
-}
 .log-bubble {
-  padding: 14px 18px; border-radius: 16px;
-  font-size: 14px; line-height: 1.6;
+  padding: 10px 13px; border-radius: 12px;
+  font-size: clamp(11px,1.2vw,13px); line-height: 1.6;
+  cursor: default;
 }
 .log-user .log-bubble {
-  background: rgba(244,114,182,0.06); border: 1px solid rgba(244,114,182,0.15);
-  border-radius: 16px 4px 16px 16px;
+  background: rgba(244,114,182,0.08); border: 1px solid rgba(244,114,182,0.2);
+  border-radius: 12px 4px 12px 12px;
 }
 .log-ai .log-bubble {
-  background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.15);
-  border-radius: 4px 16px 16px 16px;
+  background: rgba(56,189,248,0.07); border: 1px solid rgba(56,189,248,0.18);
+  border-radius: 4px 12px 12px 12px;
 }
 
 .log-meta {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
-  font-size: 11px; letter-spacing: 0.05em; opacity: 0.5;
+  display: flex; align-items: center; gap: 8px; margin-bottom: 5px;
+  font-size: 10px; letter-spacing: 0.08em; opacity: 0.6;
 }
-.log-role  { font-weight: 800; text-transform: uppercase; }
-.log-text  { color: rgba(255,255,255,0.85); }
+.log-role   { font-weight: 700; text-transform: uppercase; }
+.log-time   { font-variant-numeric: tabular-nums; }
+.log-expand { margin-left: auto; font-size: 10px; cursor: pointer; }
+.log-text   { color: rgba(255,255,255,0.82); }
 
-/* ── typing cursor ─────────────────────────────────── */
-.typing-cursor { animation: blink 1s step-end infinite; }
-@keyframes blink { 50% { opacity:0; } }
-
-@media (max-width: 1000px) {
-  .logs-overlay { flex-direction: column; gap: 20px; overflow-y: auto; align-items: center; }
-  .dna-col { width: 100%; max-width: none; flex: none; height: 45%; }
+.log-steps {
+  margin-top: 6px; padding: 8px 13px;
+  background: rgba(255,255,255,0.03); border-radius: 8px;
+  border-left: 2px solid rgba(168,85,247,0.4);
+  display: flex; flex-direction: column; gap: 5px;
 }
+.log-step {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: rgba(255,255,255,0.5);
+}
+.log-step.done    { color: rgba(34,197,94,0.85); }
+.log-step.running { color: rgba(251,191,36,0.9); }
+.step-icon { font-size: 11px; width: 14px; text-align: center; }
+.log-step.running .step-icon { animation: spin 1s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── DNA SEND BUTTON ───────────────────────────────── */
+.dna-send-btn {
+  width: 42px; height: 42px; padding: 0;
+  border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  background: rgba(79,172,254,0.08); border: 1px solid rgba(79,172,254,0.25);
+  transition: all 0.2s;
+}
+.dna-send-btn:hover:not(:disabled) {
+  background: rgba(79,172,254,0.18); border-color: rgba(79,172,254,0.5);
+  box-shadow: 0 0 16px rgba(79,172,254,0.25);
+}
+.dna-send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
