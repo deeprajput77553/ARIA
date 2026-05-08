@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { AriaStore, FILE_TYPE, startAutoSave, stopAutoSave, runAutoSave } from '../storage/AriaStore';
 
 const DEFAULTS = {
   voiceEnabled: true,
@@ -10,6 +11,7 @@ const DEFAULTS = {
   proactiveMode: true,
   theme: 'dark',
   model: 'llama3.2',
+  autoSave: false,
 };
 
 const STORAGE_KEY = 'aria_settings';
@@ -38,6 +40,11 @@ const SettingsPage = () => {
     load();
     window.speechSynthesis.onvoiceschanged = load;
   }, []);
+
+  useEffect(() => {
+    if (settings.autoSave) startAutoSave(15);
+    else stopAutoSave();
+  }, [settings.autoSave]);
 
   const set = (key, val) => setSettings(s => ({ ...s, [key]: val }));
 
@@ -140,17 +147,37 @@ const SettingsPage = () => {
           </Row>
         </Section>
 
-        <Section title="Storage">
-          <Row label="Data storage" hint="All data is stored privately on this device">
+        <Section title="Storage & Backups">
+          <Row label="Data storage" hint="All data is stored privately on this device (IndexedDB)">
             <div style={{ color: '#a78bfa', fontSize: '13px', fontWeight: '600' }}>Local Device (Private)</div>
           </Row>
-          <Row label="Persistent storage" hint="Ask browser for guaranteed local storage">
-            <button className="settings-action-btn" onClick={requestStoragePermission}>Request Permission</button>
+          <Row label="Auto Backup (.aria files)" hint="Automatically export binary encoded backups to your downloads">
+            <Toggle value={settings.autoSave} onChange={v => set('autoSave', v)}/>
+          </Row>
+          <Row label="Manual Backup" hint="Export current chat history as a binary .aria file">
+            <button className="settings-action-btn" onClick={async () => {
+              const chat = await AriaStore.load('chat', 'main', []);
+              AriaStore.exportFile(FILE_TYPE.CHAT, chat, `aria_chat_backup_${Date.now()}.aria`);
+            }}>Export .aria Backup</button>
+          </Row>
+          <Row label="Import Backup" hint="Restore chat history from an .aria file">
+            <button className="settings-action-btn" onClick={async () => {
+              const res = await AriaStore.importFile();
+              if (res) {
+                if (res.type === FILE_TYPE.CHAT) {
+                  await AriaStore.save('chat', 'main', res.data);
+                  alert('Chat backup restored successfully! Reload the app to see changes.');
+                } else {
+                  alert('Invalid file type. Expected a CHAT backup.');
+                }
+              }
+            }}>Import .aria File</button>
           </Row>
           <Row label="Clear conversation log" hint="Removes all stored messages">
             <button className="settings-action-btn danger" onClick={() => {
               if (confirm('Clear all conversation history?')) {
-                localStorage.removeItem('aria_conversation_log');
+                AriaStore.save('chat', 'main', []); // Clear IDB
+                localStorage.removeItem('aria_conversation_log'); // Clear old fallback
                 alert('Cleared.');
               }
             }}>Clear Log</button>

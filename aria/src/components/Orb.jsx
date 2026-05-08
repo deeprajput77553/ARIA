@@ -145,6 +145,7 @@ const layerFragmentShader = `
 
 import { loadSettings } from './SettingsPage';
 import { speakFemale } from './Logs';
+import Chat from './Chat';
 
 // ─── OLLAMA API HOOK ──────────────────────────────────────────────────────────
 const useOllama = () => {
@@ -222,6 +223,7 @@ const Orb = ({ onStateChange, onNavigate }) => {
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
   const [showResponse, setShowResponse] = useState(false);
+  const [showChat, setShowChat] = useState(false);
 
   const { isAvailable, model, chat } = useOllama();
 
@@ -500,16 +502,19 @@ const Orb = ({ onStateChange, onNavigate }) => {
         </div>
       )}
 
-      {/* Floating circle button to Logs */}
+      {/* Floating circle button to Logs/Chat Overlay */}
       <button
         className="orb-logs-btn"
-        onClick={() => onNavigate && onNavigate('chat')}
-        title="View Logs"
+        onClick={() => setShowChat(true)}
+        title="Open Chat"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="18" height="18">
           <path d="M12 20h9M3 20h2M3 12h18M3 4h18" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </button>
+
+      {/* Chat Overlay */}
+      {showChat && <Chat onClose={() => setShowChat(false)} />}
     </div>
   );
 };
