@@ -144,7 +144,7 @@ const layerFragmentShader = `
 `;
 
 import { loadSettings } from './SettingsPage';
-import { speakFemale } from './DNAChat';
+import { speakFemale } from './Logs';
 
 // ─── OLLAMA API HOOK ──────────────────────────────────────────────────────────
 const useOllama = () => {

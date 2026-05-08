@@ -233,8 +233,8 @@ function saveLog(log) {
   try { localStorage.setItem(LOG_KEY, JSON.stringify(log)); } catch {}
 }
 
-// ── DNAChat (Logs) Page ─────────────────────────────────────────────────────
-const DNAChat = () => {
+// ── Logs Page ─────────────────────────────────────────────────────────────
+const Logs = () => {
   const settings = loadSettings();
 
   const [log,     setLog]     = useState(loadLog);
@@ -391,4 +391,4 @@ const DNAChat = () => {
   );
 };
 
-export default DNAChat;
+export default Logs;

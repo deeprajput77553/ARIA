@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import WelcomeScreen from './components/WelcomeScreen';
 import Navbar from './components/Navbar';
 import Orb from './components/Orb';
-import DNAChat from './components/DNAChat';
+import Logs from './components/Logs';
 import AuthPage from './components/AuthPage';
 import SettingsPage from './components/SettingsPage';
 import './App.css';
@@ -24,7 +24,7 @@ function App() {
       <Navbar currentPage={screen} onNavigate={navigate}/>
       <main className="app-main">
         {screen === 'orb'      && <Orb onNavigate={navigate}/>}
-        {screen === 'chat'     && <DNAChat/>}
+        {screen === 'chat'     && <Logs/>}
         {screen === 'settings' && <SettingsPage/>}
       </main>
     </div>
