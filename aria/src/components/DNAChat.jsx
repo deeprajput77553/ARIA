@@ -231,8 +231,6 @@ const DNAChat = () => {
   const [log, setLog] = useState(() => {
     try { const s=localStorage.getItem(LOG_KEY); return s?JSON.parse(s):INIT_LOG; } catch { return INIT_LOG; }
   });
-  const [input, setInput]     = useState('');
-  const [sending, setSending] = useState(false);
   const aiListRef   = useRef(null);
   const userListRef = useRef(null);
 
@@ -248,96 +246,30 @@ const DNAChat = () => {
     }, 60);
   }, []);
 
-  const send = useCallback(async () => {
-    const text = input.trim();
-    if (!text || sending) return;
-    setInput(''); setSending(true);
-
-    const userEntry = { id:Date.now(), role:'user', text, time:now() };
-    const aiId = Date.now()+1;
-    const aiEntry = {
-      id:aiId, role:'ai', text:'', time:now(),
-      steps:[
-        {label:'Parsing intent',      status:'done'},
-        {label:'Querying knowledge',   status:'running'},
-        {label:'Generating response',  status:'pending'},
-      ]
-    };
-
-    setLog(prev => [...prev, userEntry, aiEntry]);
-    scrollBoth();
-
-    // Update steps as we go
-    const updateSteps = (steps) => setLog(prev => prev.map(e => e.id===aiId ? {...e, steps} : e));
-
-    try {
-      const res = await fetch('http://localhost:11434/api/generate', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:settings.model||'llama3.2', prompt:text, stream:true})
-      });
-      updateSteps([
-        {label:'Parsing intent',      status:'done'},
-        {label:'Querying knowledge',  status:'done'},
-        {label:'Generating response', status:'running'},
-      ]);
-      const reader = res.body.getReader(), dec = new TextDecoder();
-      let full = '';
-      while (true) {
-        const {done,value} = await reader.read(); if(done) break;
-        const lines = dec.decode(value).split('\n').filter(Boolean);
-        for (const line of lines) {
-          try { const j=JSON.parse(line); if(j.response){full+=j.response; setLog(prev=>prev.map(e=>e.id===aiId?{...e,text:full}:e)); scrollBoth(); } } catch {}
-        }
-      }
-      updateSteps([
-        {label:'Parsing intent',      status:'done'},
-        {label:'Querying knowledge',  status:'done'},
-        {label:'Generating response', status:'done'},
-      ]);
-      speakFemale(full, settings);
-    } catch {
-      setLog(prev=>prev.map(e=>e.id===aiId?{...e,text:'Ollama offline — run: ollama serve'}:e));
-    }
-    setSending(false);
-  }, [input, sending, settings, scrollBoth]);
-
-  const onKey = e => { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();} };
-
   const aiLog   = log.filter(e=>e.role==='ai');
   const userLog = log.filter(e=>e.role==='user');
 
   return (
-    <div className="dna-chat-page">
-      {/* Left: USER log */}
-      <div className="dna-col user-col">
-        <div className="col-header"><span className="col-dot user-dot"/><span>You</span></div>
-        <div className="message-list" ref={userListRef}>
-          {userLog.map((e,i)=><LogEntry key={e.id} entry={e} side="user"/>)}
-        </div>
-        <div className="chat-input-row">
-          <textarea className="chat-input" value={input} onChange={e=>setInput(e.target.value)}
-            onKeyDown={onKey} placeholder="Ask ARIA anything..." rows={2}/>
-          <button className="send-btn dna-send-btn" onClick={send} disabled={sending||!input.trim()} title="Send">
-            <DNALoader size={22} running={sending}/>
-          </button>
-        </div>
-      </div>
+    <div className="dna-chat-page logs-view">
+      {/* Background DNA */}
+      <div className="dna-center bg-helix"><DNAHelixCanvas/></div>
 
-      {/* Center: DNA helix */}
-      <div className="dna-center"><DNAHelixCanvas/></div>
+      {/* Overlaid logs */}
+      <div className="logs-overlay">
+        {/* Left: USER log */}
+        <div className="dna-col user-col">
+          <div className="col-header"><span className="col-dot user-dot"/><span>User Logs</span></div>
+          <div className="message-list" ref={userListRef}>
+            {userLog.map((e,i)=><LogEntry key={e.id} entry={e} side="user"/>)}
+          </div>
+        </div>
 
-      {/* Right: AI log */}
-      <div className="dna-col ai-col">
-        <div className="col-header"><span className="col-dot ai-dot"/><span>ARIA</span></div>
-        <div className="message-list" ref={aiListRef}>
-          {aiLog.map((e,i)=><LogEntry key={e.id} entry={e} side="ai"/>)}
-          {sending && (
-            <div className="log-entry log-ai">
-              <div className="log-bubble">
-                <div className="typing-dots"><span/><span/><span/></div>
-              </div>
-            </div>
-          )}
+        {/* Right: AI log */}
+        <div className="dna-col ai-col">
+          <div className="col-header"><span className="col-dot ai-dot"/><span>AI Logs</span></div>
+          <div className="message-list" ref={aiListRef}>
+            {aiLog.map((e,i)=><LogEntry key={e.id} entry={e} side="ai"/>)}
+          </div>
         </div>
       </div>
     </div>

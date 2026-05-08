@@ -47,30 +47,43 @@ const StarLogo = ({ size = 36 }) => (
 
 const Navbar = ({ currentPage, onNavigate }) => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
+
+  const nav = (page) => {
+    onNavigate(page);
+    setIsCollapsed(true);
+  };
 
   return (
-    <nav className="navbar">
-      {/* Logo: animated star + ARIA text */}
-      <div className="navbar-logo" onClick={() => onNavigate('orb')}>
-        <StarLogo size={34} />
-        <span className="navbar-title">ARIA</span>
+    <nav className={`navbar ${isCollapsed ? 'collapsed' : 'expanded'}`}>
+      <div className="navbar-top">
+        <div className="navbar-logo" onClick={() => nav('orb')}>
+          <StarLogo size={34} />
+          <span className="navbar-title">ARIA</span>
+        </div>
+        
+        <button className="nav-toggle" onClick={() => setIsCollapsed(!isCollapsed)}>
+          <div className={`hamburger ${!isCollapsed ? 'open' : ''}`}>
+            <span></span><span></span><span></span>
+          </div>
+        </button>
       </div>
 
       <div className="navbar-nav">
-        <button className={`nav-btn ${currentPage === 'orb'  ? 'active' : ''}`} onClick={() => onNavigate('orb')}>
+        <button className={`nav-btn ${currentPage === 'orb'  ? 'active' : ''}`} onClick={() => nav('orb')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="17" height="17">
             <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor" opacity="0.4"/>
             <path d="M12 3v2M12 19v2M3 12h2M19 12h2" strokeLinecap="round"/>
           </svg>
           <span>Orb</span>
         </button>
-        <button className={`nav-btn ${currentPage === 'chat' ? 'active' : ''}`} onClick={() => onNavigate('chat')}>
+        <button className={`nav-btn ${currentPage === 'chat' ? 'active' : ''}`} onClick={() => nav('chat')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="17" height="17">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" strokeLinejoin="round"/>
+            <path d="M12 20h9M3 20h2M3 12h18M3 4h18" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          <span>Chat</span>
+          <span>Logs</span>
         </button>
-        <button className={`nav-btn ${currentPage === 'settings' ? 'active' : ''}`} onClick={() => onNavigate('settings')}>
+        <button className={`nav-btn ${currentPage === 'settings' ? 'active' : ''}`} onClick={() => nav('settings')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="17" height="17">
             <circle cx="12" cy="12" r="3"/>
             <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" strokeLinecap="round"/>
@@ -79,31 +92,34 @@ const Navbar = ({ currentPage, onNavigate }) => {
         </button>
       </div>
 
-      <div className="navbar-user" onClick={() => setUserMenuOpen(o => !o)}>
-        <div className="user-avatar">
-          <svg viewBox="0 0 32 32" width="32" height="32">
-            <defs>
-              <linearGradient id="av-g" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#7c3aed"/><stop offset="100%" stopColor="#2563eb"/>
-              </linearGradient>
-            </defs>
-            <circle cx="16" cy="16" r="16" fill="url(#av-g)"/>
-            <circle cx="16" cy="12" r="5" fill="rgba(255,255,255,0.9)"/>
-            <path d="M6 28c0-5.523 4.477-10 10-10s10 4.477 10 10" fill="rgba(255,255,255,0.85)"/>
-          </svg>
-        </div>
-        <div className="user-status-dot"/>
-        {userMenuOpen && (
-          <div className="user-dropdown">
-            <div className="user-info">
-              <span className="user-name">Ajinkya</span>
-              <span className="user-role">Admin</span>
-            </div>
-            <div className="dropdown-divider"/>
-            <button className="dropdown-item" onClick={() => { setUserMenuOpen(false); onNavigate('settings'); }}>Settings</button>
-            <button className="dropdown-item" onClick={() => { setUserMenuOpen(false); onNavigate('signin'); }}>Sign out</button>
+      <div className="navbar-user-section">
+        <div className="navbar-user" onClick={() => setUserMenuOpen(o => !o)}>
+          <div className="user-avatar">
+            <svg viewBox="0 0 32 32" width="32" height="32">
+              <defs>
+                <linearGradient id="av-g" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#7c3aed"/><stop offset="100%" stopColor="#2563eb"/>
+                </linearGradient>
+              </defs>
+              <circle cx="16" cy="16" r="16" fill="url(#av-g)"/>
+              <circle cx="16" cy="12" r="5" fill="rgba(255,255,255,0.9)"/>
+              <path d="M6 28c0-5.523 4.477-10 10-10s10 4.477 10 10" fill="rgba(255,255,255,0.85)"/>
+            </svg>
           </div>
-        )}
+          <div className="user-status-dot"/>
+          <span className="user-name-small">Ajinkya</span>
+          {userMenuOpen && (
+            <div className="user-dropdown">
+              <div className="user-info">
+                <span className="user-name">Ajinkya</span>
+                <span className="user-role">Admin</span>
+              </div>
+              <div className="dropdown-divider"/>
+              <button className="dropdown-item" onClick={() => nav('settings')}>Settings</button>
+              <button className="dropdown-item" onClick={() => nav('signin')}>Sign out</button>
+            </div>
+          )}
+        </div>
       </div>
     </nav>
   );

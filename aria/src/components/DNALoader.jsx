@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 
-// DNA Loader canvas — ported from dna-loader-buttons.html
-const DNALoaderCanvas = ({ size = 22, running = true }) => {
+const DNALoader = ({ size = 22, running = true }) => {
   const ref = useRef(null);
+  const ghostRef = useRef(null);
   const stateRef = useRef({ phi: 0, last: null, time: 0, frameId: null });
 
   useEffect(() => {
@@ -16,10 +16,19 @@ const DNALoaderCanvas = ({ size = 22, running = true }) => {
     const ctx = cv.getContext('2d');
     ctx.scale(DPR, DPR);
 
+    if (!ghostRef.current) {
+      ghostRef.current = document.createElement('canvas');
+      ghostRef.current.width = size * DPR;
+      ghostRef.current.height = size * DPR;
+      const gc = ghostRef.current.getContext('2d');
+      gc.scale(DPR, DPR);
+    }
+    const gCtx = ghostRef.current.getContext('2d');
+
     const S = size, CX = S/2, CY = S/2;
     const VSPAN = S * 0.82, TOP = CY - VSPAN/2;
     const AMP = S * 0.22, SW = S * 0.10, RW = S * 0.10;
-    const STEPS = 80, TURNS = 1, RUNGS = 5;
+    const STEPS = 80, RUNGS = 5;
     const CA_FRONT = '#4facfe', CA_BACK = '#071828';
     const CB_FRONT = '#f64f59', CB_BACK = '#1e0008';
     const SCOLS = [
@@ -49,16 +58,18 @@ const DNALoaderCanvas = ({ size = 22, running = true }) => {
 
     const draw = (phi, time) => {
       const spd = speed(time);
-      const fade = 0.50 + 0.28*(spd/7.5);
-      ctx.fillStyle = `rgba(8,8,15,${fade})`;
-      ctx.fillRect(0,0,S,S);
+      const trailAlpha = 0.08 + 0.18 * (1 - Math.min(spd/7, 1));
+      gCtx.fillStyle = `rgba(10,10,15,${trailAlpha + 0.55})`;
+      gCtx.fillRect(0,0,S,S);
+
+      ctx.clearRect(0,0,S,S);
       ctx.save();
       ctx.translate(CX,CY); ctx.rotate(Math.PI/4); ctx.translate(-CX,-CY);
 
       const pts = (phase) => {
         const a = [];
         for (let i = 0; i <= STEPS; i++) {
-          const f = i/STEPS, t = phi + phase + f*Math.PI*2*TURNS;
+          const f = i/STEPS, t = phi + phase + f*Math.PI*2;
           a.push({x:CX+Math.cos(t)*AMP, y:TOP+f*VSPAN, depth:(Math.sin(t)+1)/2});
         }
         return a;
@@ -129,4 +140,4 @@ const DNALoaderCanvas = ({ size = 22, running = true }) => {
   return <canvas ref={ref} style={{display:'block'}}/>;
 };
 
-export default DNALoaderCanvas;
+export default DNALoader;

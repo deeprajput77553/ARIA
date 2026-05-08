@@ -98,7 +98,7 @@ const SettingsPage = () => {
           <p>Configure your ARIA experience — all stored locally on your device.</p>
         </div>
 
-        <Section title="🎙 Voice">
+        <Section title="Voice">
           <Row label="Voice output" hint="ARIA speaks responses aloud">
             <Toggle value={settings.voiceEnabled} onChange={v => set('voiceEnabled', v)}/>
           </Row>
@@ -119,7 +119,7 @@ const SettingsPage = () => {
           <button className="settings-action-btn" onClick={testVoice}>Test Voice</button>
         </Section>
 
-        <Section title="🤖 AI Persona">
+        <Section title="AI Persona">
           <Row label="Persona mode">
             <select className="settings-select" value={settings.persona} onChange={e => set('persona', e.target.value)}>
               <option value="friend">Friend — casual, warm</option>
@@ -141,7 +141,7 @@ const SettingsPage = () => {
           </Row>
         </Section>
 
-        <Section title="💾 Storage">
+        <Section title="Storage">
           <Row label="Priority" hint="Local device storage is always used first">
             <select className="settings-select" value={settings.storageMode} onChange={e => set('storageMode', e.target.value)}>
               <option value="local">Local only (private, offline)</option>
