@@ -143,10 +143,13 @@ const layerFragmentShader = `
   }
 `;
 
+import { loadSettings } from './SettingsPage';
+import { speakFemale } from './DNAChat';
+
 // ─── OLLAMA API HOOK ──────────────────────────────────────────────────────────
 const useOllama = () => {
   const [isAvailable, setIsAvailable] = useState(false);
-  const [model, setModel] = useState('llama3.2');
+  const [model, setModel] = useState(() => loadSettings().model || 'llama3.2');
 
   useEffect(() => {
     const checkOllama = async () => {
@@ -312,7 +315,8 @@ const Orb = ({ onStateChange }) => {
         await chat(
           _transcript,
           (chunk) => setResponse(prev => prev + chunk),
-          () => {
+          (full) => {
+            speakFemale(full, loadSettings());
             setStatusText('Done — tap to speak again');
             setTimeout(() => setOrbState(0), 800);
             setTimeout(() => setStatusText('Tap to speak'), 3500);

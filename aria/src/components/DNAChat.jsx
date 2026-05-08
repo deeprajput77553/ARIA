@@ -18,7 +18,7 @@ function playClick() {
 }
 
 // ── Female TTS ──────────────────────────────────────────────────────────────
-function speakFemale(text, settings) {
+export function speakFemale(text, settings) {
   if (!settings?.voiceEnabled) return;
   window.speechSynthesis.cancel();
   const utt = new SpeechSynthesisUtterance(text);
