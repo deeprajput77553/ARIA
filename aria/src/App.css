@@ -488,3 +488,154 @@
 /* ── Fade-in utility ───────────────────────────────── */
 .fade-in { animation: fadeIn 0.8s ease both; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── SETTINGS PAGE ─────────────────────────────────── */
+.settings-page {
+  height: 100%; overflow-y: auto; padding: clamp(20px,4vw,48px);
+  display: flex; justify-content: center;
+  background: radial-gradient(ellipse at 30% 20%, rgba(80,40,140,0.07), transparent 60%);
+}
+.settings-card {
+  width: 100%; max-width: 680px;
+  display: flex; flex-direction: column; gap: 28px;
+}
+.settings-header h2 {
+  font-size: clamp(22px,3vw,28px); font-weight: 700; color: white; margin-bottom: 6px;
+}
+.settings-header p { font-size: 14px; color: rgba(255,255,255,0.4); }
+
+.settings-section {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px; padding: 20px 24px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.settings-section-title {
+  font-size: 13px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: rgba(168,85,247,0.8);
+  margin-bottom: 4px;
+}
+.settings-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+}
+.settings-label  { font-size: 14px; color: rgba(255,255,255,0.8); }
+.settings-hint   { display: block; font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 2px; }
+
+.settings-select, .settings-input {
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px; color: white; padding: 9px 12px; font-size: 13px;
+  outline: none; font-family: inherit; min-width: 180px;
+  transition: border-color 0.2s;
+}
+.settings-select:focus, .settings-input:focus { border-color: rgba(168,85,247,0.5); }
+.settings-select option { background: #110920; }
+
+.settings-slider {
+  -webkit-appearance: none; appearance: none;
+  width: 160px; height: 4px; border-radius: 4px;
+  background: rgba(255,255,255,0.12); outline: none; cursor: pointer;
+}
+.settings-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  background: linear-gradient(135deg, #7c3aed, #38bdf8);
+  box-shadow: 0 0 8px rgba(124,58,237,0.5);
+}
+
+.settings-action-btn {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.7); padding: 8px 16px; border-radius: 9px;
+  font-size: 13px; cursor: pointer; transition: all 0.2s; font-family: inherit;
+}
+.settings-action-btn:hover { background: rgba(255,255,255,0.12); color: white; }
+.settings-action-btn.danger:hover { background: rgba(239,68,68,0.15); color: #f87171; border-color: rgba(239,68,68,0.3); }
+
+.toggle {
+  width: 44px; height: 24px; border-radius: 12px;
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+  position: relative; cursor: pointer; transition: background 0.25s;
+  flex-shrink: 0;
+}
+.toggle.on { background: linear-gradient(135deg, #7c3aed, #2563eb); border-color: transparent; }
+.toggle-knob {
+  position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
+  border-radius: 50%; background: white;
+  transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.toggle.on .toggle-knob { transform: translateX(20px); }
+
+.settings-footer { display: flex; justify-content: flex-end; padding-bottom: 20px; }
+.settings-save-btn {
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  color: white; border: none; padding: 12px 32px;
+  border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer;
+  transition: all 0.25s; box-shadow: 0 4px 20px rgba(124,58,237,0.35);
+}
+.settings-save-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 28px rgba(124,58,237,0.5); }
+
+/* ── LOG ENTRIES ───────────────────────────────────── */
+.log-entry {
+  animation: msg-in 0.4s cubic-bezier(0.16,1,0.3,1) both;
+  animation-delay: var(--delay,0s);
+}
+@keyframes msg-in {
+  from { opacity:0; transform:translateY(10px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.log-bubble {
+  padding: 10px 13px; border-radius: 12px;
+  font-size: clamp(11px,1.2vw,13px); line-height:1.6;
+  cursor: default;
+}
+.log-user .log-bubble {
+  background: rgba(244,114,182,0.08); border: 1px solid rgba(244,114,182,0.2);
+  border-radius: 12px 4px 12px 12px;
+}
+.log-ai .log-bubble {
+  background: rgba(56,189,248,0.07); border: 1px solid rgba(56,189,248,0.18);
+  border-radius: 4px 12px 12px 12px;
+}
+.log-bubble:has(.log-steps-trigger) { cursor: pointer; }
+
+.log-meta {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 5px;
+  font-size: 10px; letter-spacing: 0.08em; opacity: 0.6;
+}
+.log-role  { font-weight: 700; text-transform: uppercase; }
+.log-time  { font-variant-numeric: tabular-nums; }
+.log-expand { margin-left: auto; font-size: 10px; cursor: pointer; }
+.log-text  { color: rgba(255,255,255,0.82); }
+
+.log-steps {
+  margin-top: 6px; padding: 8px 13px;
+  background: rgba(255,255,255,0.03); border-radius: 8px;
+  border-left: 2px solid rgba(168,85,247,0.4);
+  display: flex; flex-direction: column; gap: 5px;
+}
+.log-step {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: rgba(255,255,255,0.5);
+}
+.log-step.done    { color: rgba(34,197,94,0.8); }
+.log-step.running { color: rgba(251,191,36,0.9); }
+.step-icon { font-size: 11px; width: 14px; text-align: center; }
+.log-step.running .step-icon { animation: spin 1s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── DNA SEND BUTTON ───────────────────────────────── */
+.dna-send-btn {
+  width: 46px; height: 46px; padding: 0;
+  border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  background: rgba(79,172,254,0.08); border: 1px solid rgba(79,172,254,0.25);
+  transition: all 0.2s;
+}
+.dna-send-btn:hover:not(:disabled) {
+  background: rgba(79,172,254,0.18); border-color: rgba(79,172,254,0.5);
+  box-shadow: 0 0 16px rgba(79,172,254,0.25);
+}
+.dna-send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ── typing cursor ─────────────────────────────────── */
+.typing-cursor { animation: blink 1s step-end infinite; }
+@keyframes blink { 50% { opacity:0; } }
