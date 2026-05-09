@@ -333,13 +333,24 @@
   50%     { opacity: 0.6; transform: scale(0.8); }
 }
 
-.message-list {
-  flex: 1; overflow-y: auto; display: flex; flex-direction: column;
-  gap: 10px; padding-right: 4px;
-  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.08) transparent;
+.message-list-sync {
+  flex: 1;
+  position: relative;
+  width: 100%;
+  perspective: 1000px;
 }
-.message-list::-webkit-scrollbar { width: 4px; }
-.message-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+.dna-equator-guide {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.4), transparent);
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.2);
+  z-index: 5;
+  pointer-events: none;
+}
 
 .message-bubble {
   animation: msg-in 0.4s cubic-bezier(0.16,1,0.3,1) both;

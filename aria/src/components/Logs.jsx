@@ -238,28 +238,66 @@ const Logs = () => {
   const settings = loadSettings();
 
   const [log, setLog] = useState(loadLog);
+  const [scrollTop, setScrollTop] = useState(0);
 
-  const aiListRef   = useRef(null);
-  const userListRef = useRef(null);
+  const containerRef = useRef(null);
+  const scrollRef    = useRef(0);
 
-  useEffect(() => { saveLog(log); }, [log]);
-
-  const scrollBoth = useCallback(() => {
-    setTimeout(() => {
-      aiListRef.current?.scrollTo({top:aiListRef.current.scrollHeight,   behavior:'smooth'});
-      userListRef.current?.scrollTo({top:userListRef.current.scrollHeight,behavior:'smooth'});
-    }, 60);
+  useEffect(() => {
+    const handleWheel = (e) => {
+      e.preventDefault();
+      scrollRef.current += e.deltaY;
+      // Clamp or let it be free? Let's limit it based on content
+      setScrollTop(scrollRef.current);
+    };
+    const el = containerRef.current;
+    if (el) el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el?.removeEventListener('wheel', handleWheel);
   }, []);
 
   useEffect(() => {
-    scrollBoth();
-  }, [log, scrollBoth]);
+    // Auto-scroll to end on load
+    const initialPos = log.length * 80; // Rough estimate
+    scrollRef.current = initialPos;
+    setScrollTop(initialPos);
+  }, [log.length]);
+
+  const getStyle = (index, total) => {
+    // The visual center is at 0 (or some offset)
+    // We want to calculate how far this message is from the "current" center
+    // Each message has a virtual height (e.g., 120px)
+    const itemHeight = 150; 
+    const centerPos = scrollTop;
+    const itemPos = index * itemHeight;
+    const dist = Math.abs(itemPos - centerPos);
+    
+    // Normalize distance (0 to 1 range for about 3 items visibility)
+    const maxDist = 400; 
+    const ratio = Math.max(0, 1 - dist / maxDist);
+    const opacity = Math.pow(ratio, 2);
+    const scale = 0.6 + 0.4 * ratio;
+    const blur = (1 - ratio) * 4;
+
+    return {
+      opacity,
+      transform: `scale(${scale}) translateY(${(itemPos - centerPos)}px)`,
+      filter: `blur(${blur}px)`,
+      transition: 'transform 0.1s ease-out, opacity 0.1s ease-out',
+      position: 'absolute',
+      top: '50%',
+      left: 0,
+      right: 0,
+      marginTop: '-40px' // Half of bubble height roughly
+    };
+  };
 
   const aiLog   = log.filter(e => e.role === 'ai');
   const userLog = log.filter(e => e.role === 'user');
 
   return (
-    <div className="dna-chat-page">
+    <div className="dna-chat-page" ref={containerRef}>
+      {/* Visual Equator Line */}
+      <div className="dna-equator-guide" />
 
       {/* ── Left: USER logs ───────────────────────────────── */}
       <div className="dna-col user-col">
@@ -267,8 +305,12 @@ const Logs = () => {
           <span className="col-dot user-dot"/>
           <span>User Logs</span>
         </div>
-        <div className="message-list" ref={userListRef}>
-          {userLog.map(e => <LogEntry key={e.id} entry={e} side="user"/>)}
+        <div className="message-list-sync">
+          {log.map((e, i) => e.role === 'user' ? (
+            <div key={e.id} style={getStyle(i, log.length)}>
+              <LogEntry entry={e} side="user"/>
+            </div>
+          ) : null)}
         </div>
       </div>
 
@@ -283,8 +325,12 @@ const Logs = () => {
           <span className="col-dot ai-dot"/>
           <span>AI Logs</span>
         </div>
-        <div className="message-list" ref={aiListRef}>
-          {aiLog.map(e => <LogEntry key={e.id} entry={e} side="ai"/>)}
+        <div className="message-list-sync">
+          {log.map((e, i) => e.role === 'ai' ? (
+            <div key={e.id} style={getStyle(i, log.length)}>
+              <LogEntry entry={e} side="ai"/>
+            </div>
+          ) : null)}
         </div>
       </div>
     </div>
