@@ -172,15 +172,14 @@ const DNAHelixCanvas = () => {
     };
     requestAnimationFrame(render);
 
-    const onWheel = e => {
-      e.preventDefault();
-      sRef.current.scrollVel += e.deltaY * 0.002;
+    const onDNAWheel = e => {
+      sRef.current.scrollVel += e.detail.deltaY * 0.002;
       const now = Date.now();
       if (now - sRef.current.lastClickTs > 55) { sRef.current.lastClickTs = now; playClick(); }
     };
-    cv.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('dna-scroll', onDNAWheel);
 
-    return () => { cancelAnimationFrame(fid); window.removeEventListener('resize', resize); cv.removeEventListener('wheel', onWheel); };
+    return () => { cancelAnimationFrame(fid); window.removeEventListener('resize', resize); window.removeEventListener('dna-scroll', onDNAWheel); };
   }, []);
 
   return <canvas ref={ref} className="dna-canvas" style={{ width: '100%', height: '100%' }} />;
@@ -188,31 +187,33 @@ const DNAHelixCanvas = () => {
 
 // ── Premium Log Entry Card ──────────────────────────────────────────────────
 const PremiumLogEntry = ({ entry, role }) => {
-  const [open, setOpen] = useState(false);
   const isUser = role === 'user';
+  
+  const displayText = isUser 
+    ? entry.text 
+    : (entry.text && entry.text.length > 65 ? entry.text.substring(0, 65) + '...' : entry.text) || 'Processing cognitive intent...';
 
   return (
-    <div className={`premium-log-entry ${isUser ? 'user' : 'ai'} ${open ? 'focused' : ''}`}>
-      <div className="premium-log-card" onClick={() => entry.steps?.length > 0 && setOpen(o => !o)}>
+    <div className={`premium-log-entry compact ${isUser ? 'user' : 'ai'}`}>
+      <div className="premium-log-card">
         <div className="premium-log-meta">
           <div className="meta-left">
             <div className={`meta-icon ${isUser ? 'user' : 'ai'}`}>
-              {isUser ? '👤' : '⬡'}
+              {isUser ? (
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2.5" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              ) : (
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2.5" fill="none"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/></svg>
+              )}
             </div>
-            <span className="meta-role">{isUser ? 'YOU' : 'ARIA'}</span>
-            <span className="meta-time">{entry.time}</span>
+            <span className="meta-role">{isUser ? 'OPERATOR' : 'ARIA CORE'}</span>
           </div>
+          <span className="meta-time">{entry.time}</span>
         </div>
-        <p className="premium-text">{entry.text || <span className="typing-cursor">▌</span>}</p>
         
-        {entry.steps?.length > 0 && (
-          <div className="premium-expand-hint">
-            {open ? 'Hide steps ▴' : 'Show cognitive steps ▾'}
-          </div>
-        )}
+        <p className="premium-text">{displayText || <span className="typing-cursor">▌</span>}</p>
 
-        {open && entry.steps && (
-          <div className="premium-steps-panel">
+        {!isUser && entry.steps && entry.steps.length > 0 && (
+          <div className="premium-steps-panel static">
             {entry.steps.map((s, i) => (
               <div key={i} className={`premium-step ${s.status}`}>
                 <div className="step-dot" />
@@ -229,11 +230,10 @@ const PremiumLogEntry = ({ entry, role }) => {
   );
 };
 
-// ── Logs Page (3-column Architecture) ──────────────────────────────────────────
+// ── Logs Page (Unified Scrolling Architecture) ───────────────────────────────
 const Logs = () => {
   const [msgs, setMsgs] = useState([]);
-  const aiListRef = useRef(null);
-  const userListRef = useRef(null);
+  const scrollRef = useRef(null);
 
   const refresh = useCallback(async () => {
     const data = await DB.getMessages();
@@ -247,35 +247,74 @@ const Logs = () => {
     return () => { unsubNew(); unsubUpd(); };
   }, [refresh]);
 
-  useEffect(() => {
-    // Sync scrolling
-    const opts = { top: 999999, behavior: 'smooth' };
-    aiListRef.current?.scrollTo(opts);
-    userListRef.current?.scrollTo(opts);
+  const interactions = React.useMemo(() => {
+    const arr = [];
+    let curr = { user: null, ai: null, id: null };
+    msgs.forEach(m => {
+      if (m.role === 'user') {
+        if (curr.user) arr.push(curr);
+        curr = { user: m, ai: null, id: m.id };
+      } else {
+        curr.ai = m;
+        arr.push(curr);
+        curr = { user: null, ai: null, id: m.id };
+      }
+    });
+    if (curr.user || curr.ai) arr.push(curr);
+    return arr;
   }, [msgs]);
 
-  const userLog = msgs.filter(m => m.role === 'user');
-  const aiLog   = msgs.filter(m => m.role === 'ai');
+  const updateFades = useCallback(() => {
+    if (!scrollRef.current) return;
+    const container = scrollRef.current;
+    const centerY = container.getBoundingClientRect().height / 2;
+    const rows = container.querySelectorAll('.interaction-row');
+    
+    rows.forEach(row => {
+      const rect = row.getBoundingClientRect();
+      const rowCenter = rect.top + rect.height / 2 - container.getBoundingClientRect().top;
+      const dist = Math.abs(centerY - rowCenter);
+      
+      const maxDist = 350; 
+      let opacity = 1 - (dist / maxDist) * 0.85; 
+      if (opacity < 0.15) opacity = 0.15;
+      
+      let scale = 1 - (dist / maxDist) * 0.15; 
+      if (scale < 0.85) scale = 0.85;
+      
+      row.style.opacity = opacity;
+      row.style.transform = `scale(${scale})`;
+      
+      if (dist < 100) {
+        row.classList.add('focused-row');
+      } else {
+        row.classList.remove('focused-row');
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (scrollRef.current && interactions.length > 0) {
+      const rows = scrollRef.current.querySelectorAll('.interaction-row');
+      if (rows.length > 0) {
+        rows[rows.length - 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+    setTimeout(updateFades, 50);
+  }, [interactions.length, updateFades]);
+
+  const handleScroll = (e) => {
+    updateFades();
+  };
+
+  const handleWheel = (e) => {
+    window.dispatchEvent(new CustomEvent('dna-scroll', { detail: { deltaY: e.deltaY } }));
+  };
 
   return (
-    <div className="dna-chat-page">
-      {/* Column 1: User Logs */}
-      <div className="dna-col user-col">
-        <div className="col-header">
-          <span className="col-dot user-dot" />
-          <span>USER LOGS</span>
-        </div>
-        <div className="message-list premium-scroll" ref={userListRef}>
-          {userLog.length === 0 ? (
-            <div className="log-placeholder">Waiting for user input...</div>
-          ) : (
-            userLog.map(m => <PremiumLogEntry key={m.id} entry={m} role="user" />)
-          )}
-        </div>
-      </div>
-
-      {/* Column 2: DNA Center */}
-      <div className="dna-center">
+    <div className="dna-chat-page unified-layout">
+      {/* Background DNA */}
+      <div className="dna-bg-container">
         <div className="dna-equator-guide" />
         <DNAHelixCanvas />
         <div className="logs-footer">
@@ -284,19 +323,26 @@ const Logs = () => {
         </div>
       </div>
 
-      {/* Column 3: AI Logs */}
-      <div className="dna-col ai-col">
-        <div className="col-header">
-          <span className="col-dot ai-dot" />
-          <span>AI LOGS</span>
-        </div>
-        <div className="message-list premium-scroll" ref={aiListRef}>
-          {aiLog.length === 0 ? (
-            <div className="log-placeholder">Awaiting cognitive processing...</div>
-          ) : (
-            aiLog.map(m => <PremiumLogEntry key={m.id} entry={m} role="ai" />)
-          )}
-        </div>
+      {/* Foreground Scroll Container */}
+      <div 
+        className="unified-scroll-container premium-scroll" 
+        ref={scrollRef} 
+        onScroll={handleScroll}
+        onWheel={handleWheel}
+      >
+        <div className="scroll-padding-top" />
+        {interactions.map((interaction, idx) => (
+          <div className="interaction-row" key={interaction.id || idx}>
+            <div className="row-col user-col-item">
+              {interaction.user && <PremiumLogEntry entry={interaction.user} role="user" />}
+            </div>
+            <div className="row-col center-gap"></div>
+            <div className="row-col ai-col-item">
+              {interaction.ai && <PremiumLogEntry entry={interaction.ai} role="ai" />}
+            </div>
+          </div>
+        ))}
+        <div className="scroll-padding-bottom" />
       </div>
     </div>
   );

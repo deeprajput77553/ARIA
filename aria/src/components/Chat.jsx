@@ -119,7 +119,10 @@ const Chat = ({ onNavigate }) => {
     <div className="chat-fullscreen">
       <header className="cf-header">
         <div className="cf-header-left">
-          <div className="cf-orb-dot" />
+          <div className="cf-orb-dot-container">
+            <div className="cf-orb-dot" />
+            <div className="cf-orb-ring" />
+          </div>
           <div>
             <div className="cf-title">ARIA Cognitive Chat</div>
             <div className="cf-subtitle">Real-time Neural Interface</div>
@@ -131,13 +134,13 @@ const Chat = ({ onNavigate }) => {
             onClick={handleClearClick} 
             title={confirmClear ? "Click again to confirm" : "Clear Chat"}
           >
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M19 6L18 19a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
               <path d="M10 11v6M14 11v6M4 6h16M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
             </svg>
           </button>
           <button className="cf-icon-btn cf-close" onClick={() => onNavigate('orb')}>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
@@ -156,7 +159,10 @@ const Chat = ({ onNavigate }) => {
             </div>
             <div className="cf-bubble">
               <div className="cf-meta">
-                <span className="cf-role">{m.role === 'user' ? 'Operator' : 'ARIA'}</span>
+                <span className={`cf-status-pill ${m.role}`}>
+                  <span className="pill-dot" />
+                  {m.role === 'user' ? 'Operator' : 'ARIA Core'}
+                </span>
                 <span className="cf-time">{m.time}</span>
               </div>
               {m.text && <p className="cf-text">{m.text}</p>}
