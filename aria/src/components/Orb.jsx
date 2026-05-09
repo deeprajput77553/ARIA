@@ -144,7 +144,8 @@ const layerFragmentShader = `
 `;
 
 import { loadSettings } from './SettingsPage';
-import { speakFemale } from './Logs';
+import { speakFemale, loadLog, saveLog } from './Logs';
+import { loadProfile, buildProactiveGreeting } from '../storage/UserProfile';
 import Chat from './Chat';
 
 // ─── OLLAMA API HOOK ──────────────────────────────────────────────────────────
@@ -228,6 +229,25 @@ const Orb = ({ onStateChange, onNavigate }) => {
   const { isAvailable, model, chat } = useOllama();
 
   const recognitionRef = useRef(null);
+  const greetedRef = useRef(false);
+
+  // Proactive greeting on mount
+  useEffect(() => {
+    if (greetedRef.current) return;
+    (async () => {
+      const p = await loadProfile();
+      const existing = loadLog();
+      // Only greet if log is empty or if it's been a while (optional)
+      // For now, let's greet if it's the start of the session
+      const text = buildProactiveGreeting(p);
+      setResponse(text);
+      setShowResponse(true);
+      setOrbState(2);
+      speakFemale(text, loadSettings());
+      setTimeout(() => setOrbState(0), 1000);
+      greetedRef.current = true;
+    })();
+  }, [setOrbState]);
 
   const setOrbState = useCallback((s) => {
     orbState.current = s;

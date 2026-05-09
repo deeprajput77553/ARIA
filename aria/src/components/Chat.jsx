@@ -59,12 +59,14 @@ const Chat = ({ onClose }) => {
       if (existing && existing.length > 0) {
         setMsgs(existing);
       } else {
+        const text = getGreeting(updated);
         const greeting = {
-          id: Date.now(), role:'ai', text: getGreeting(updated), time: nowStr(),
+          id: Date.now(), role:'ai', text, time: nowStr(),
           steps: WORKFLOW_STEPS.map(s => ({...s, status:'done'}))
         };
         const initial = [greeting];
         setMsgs(initial); saveLog(initial);
+        speakFemale(text, settings);
       }
       setTimeout(() => inputRef.current?.focus(), 200);
     })();
