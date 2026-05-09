@@ -49,17 +49,37 @@ const Chat = ({ onNavigate }) => {
     msgBus.emit(BUS_EVENTS.NEW_MESSAGE, aiMsg);
 
     try {
+      let targetModel = settings.model || 'llama3.2';
+      
+      // Auto-detect best model if the target isn't found
+      try {
+        const tagRes = await fetch('http://localhost:11434/api/tags');
+        if (tagRes.ok) {
+          const data = await tagRes.json();
+          const models = data.models?.map(m => m.name) || [];
+          if (!models.some(m => m === targetModel || m.startsWith(targetModel + ':'))) {
+            const preferred = ['llama3.3', 'llama3.2', 'llama3.1', 'llama3', 'mistral', 'phi3', 'gemma3', 'deepseek-r1'];
+            for (const p of preferred) {
+              const found = models.find(m => m.toLowerCase().includes(p.toLowerCase()));
+              if (found) { targetModel = found; break; }
+            }
+          }
+        }
+      } catch (e) {
+        // Ignore tag fetch errors and proceed with targetModel
+      }
+
       const res = await fetch('http://localhost:11434/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: settings.model || 'llama3.2',
+          model: targetModel,
           prompt: text,
           stream: true
         }),
       });
 
-      if (!res.ok) throw new Error('Ollama offline');
+      if (!res.ok) throw new Error('Ollama connection failed. Ensure `ollama serve` is running and the model is installed.');
 
       await DB.updateMessage(aiMsg.id, {
         steps: [
