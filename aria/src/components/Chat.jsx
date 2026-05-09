@@ -1,16 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { loadSettings } from './SettingsPage';
-import { speakFemale, loadLog, saveLog, LOG_KEY } from './Logs';
+import { speakFemale, loadLog, saveLog } from './Logs';
+import { runWorkflow, WORKFLOW_STEPS } from '../storage/AgentWorkflow';
+import { loadProfile, incrementSession, buildProactiveGreeting } from '../storage/UserProfile';
 
 const nowStr = () => new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
 
-function getGreeting() {
-  const h   = new Date().getHours();
-  const day = new Date().toLocaleDateString('en-US',{weekday:'long'});
-  if (h>=5  && h<12) return `Good morning! It's ${day}. I'm ARIA — what can I help you with today?`;
-  if (h>=12 && h<17) return `Good afternoon! Happy ${day}. How can I assist?`;
-  if (h>=17 && h<21) return `Good evening! Hope your ${day} went well. What's on your mind?`;
-  return `Hello! Working late on ${day}? I'm always here for you.`;
+function getGreeting(profile) {
+  return buildProactiveGreeting(profile);
 }
 
 // ── Message Bubble ────────────────────────────────────────────────────────────
@@ -45,27 +42,32 @@ const Bubble = ({ msg }) => {
 // ── Chat Component ────────────────────────────────────────────────────────────
 const Chat = ({ onClose }) => {
   const settings = loadSettings();
+  const [profile, setProfile] = useState(null);
   const [msgs,    setMsgs]    = useState([]);
   const [input,   setInput]   = useState('');
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
 
-  // Load shared log + greet if empty
+  // Load shared history + profile + greet if empty
   useEffect(() => {
-    const existing = loadLog();
-    if (existing && existing.length > 0) {
-      setMsgs(existing);
-    } else {
-      const greeting = {
-        id: Date.now(), role:'ai', text: getGreeting(), time: nowStr(),
-        steps:[{label:'Context evaluated',status:'done'},{label:'Greeting generated',status:'done'}]
-      };
-      const initial = [greeting];
-      setMsgs(initial);
-      saveLog(initial);
-    }
-    setTimeout(() => inputRef.current?.focus(), 200);
+    (async () => {
+      const p = await loadProfile();
+      const updated = await incrementSession(p);
+      setProfile(updated);
+      const existing = loadLog();
+      if (existing && existing.length > 0) {
+        setMsgs(existing);
+      } else {
+        const greeting = {
+          id: Date.now(), role:'ai', text: getGreeting(updated), time: nowStr(),
+          steps: WORKFLOW_STEPS.map(s => ({...s, status:'done'}))
+        };
+        const initial = [greeting];
+        setMsgs(initial); saveLog(initial);
+      }
+      setTimeout(() => inputRef.current?.focus(), 200);
+    })();
   }, []);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:'smooth' }); }, [msgs]);
@@ -81,51 +83,25 @@ const Chat = ({ onClose }) => {
     const userMsg = { id:userId, role:'user', text, time:nowStr() };
     const aiMsg   = {
       id:aiId, role:'ai', text:'', time:nowStr(),
-      steps:[
-        {label:'Parsing intent',      status:'running'},
-        {label:'Querying knowledge',  status:'pending'},
-        {label:'Generating response', status:'pending'},
-      ]
+      steps: WORKFLOW_STEPS.map(s => ({...s, status:'pending'}))
     };
 
     setMsgs(prev => { const u=[...prev,userMsg,aiMsg]; saveLog(u); return u; });
 
     try {
-      const res = await fetch('http://localhost:11434/api/generate', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ model:settings.model||'llama3.2', prompt:text, stream:true }),
-      });
-
-      setMsgs(prev => prev.map(m => m.id===aiId ? {...m, steps:[
-        {label:'Parsing intent',      status:'done'},
-        {label:'Querying knowledge',  status:'running'},
-        {label:'Generating response', status:'pending'},
-      ]} : m));
-
-      const reader = res.body.getReader();
-      const dec    = new TextDecoder();
-      let full     = '';
-
-      while (true) {
-        const {done,value} = await reader.read();
-        if (done) break;
-        for (const line of dec.decode(value).split('\n').filter(Boolean)) {
-          try {
-            const j = JSON.parse(line);
-            if (j.response) {
-              full += j.response;
-              setMsgs(prev => { const u=prev.map(m=>m.id===aiId?{...m,text:full}:m); saveLog(u); return u; });
-            }
-          } catch {}
-        }
-      }
-
-      setMsgs(prev => { const u=prev.map(m=>m.id===aiId?{...m,steps:[
-        {label:'Parsing intent',      status:'done'},
-        {label:'Querying knowledge',  status:'done'},
-        {label:'Generating response', status:'done'},
-      ]}:m); saveLog(u); return u; });
-      speakFemale(full, settings);
+      const { fullResponse } = await runWorkflow(
+        text,
+        settings.model || 'llama3.2',
+        // onStepUpdate
+        (updatedSteps) => {
+          setMsgs(prev => { const u=prev.map(m=>m.id===aiId?{...m,steps:updatedSteps}:m); saveLog(u); return u; });
+        },
+        // onToken (streaming)
+        (partial) => {
+          setMsgs(prev => { const u=prev.map(m=>m.id===aiId?{...m,text:partial}:m); saveLog(u); return u; });
+        },
+      );
+      speakFemale(fullResponse, settings);
     } catch {
       setMsgs(prev => { const u=prev.map(m=>m.id===aiId?{...m,text:'⚠ Ollama offline — run: ollama serve'}:m); saveLog(u); return u; });
     }

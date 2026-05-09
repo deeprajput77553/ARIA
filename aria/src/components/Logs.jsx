@@ -179,7 +179,7 @@ const Logs = () => {
   }, []);
 
   // Style for each turn — centered, shrink + fade away from focus
-  const SLOT_H = 140;
+  const SLOT_H = 90;
   const getTurnStyle = (idx) => {
     const dist    = idx - focusedIdx;
     const absDist = Math.abs(dist);
