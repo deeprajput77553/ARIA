@@ -3,6 +3,8 @@ import DNALoader from './DNALoader';
 import { loadSettings } from './SettingsPage';
 import { DB } from '../storage/Database.js';
 import { msgBus, BUS_EVENTS } from '../storage/MessageBus.js';
+import { FiCpu, FiCheckCircle, FiDatabase, FiLoader, FiTerminal, FiSearch, FiMessageSquare, FiActivity } from 'react-icons/fi';
+import { FaBrain, FaNetworkWired, FaCodeBranch, FaMagic, FaRegLightbulb } from 'react-icons/fa';
 
 // ── Audio click sound ───────────────────────────────────────────────────────
 function playClick() {
@@ -16,6 +18,25 @@ function playClick() {
     g.gain.setValueAtTime(0.12, ac.currentTime);
     g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.05);
     o.start(); o.stop(ac.currentTime + 0.05);
+  } catch { }
+}
+
+function playTikTik() {
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const playTone = (time) => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.connect(g); g.connect(ac.destination);
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(3000, time);
+      o.frequency.exponentialRampToValueAtTime(800, time + 0.02);
+      g.gain.setValueAtTime(0.15, time);
+      g.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+      o.start(time); o.stop(time + 0.03);
+    };
+    const now = ac.currentTime;
+    playTone(now);
+    playTone(now + 0.08);
   } catch { }
 }
 
@@ -186,26 +207,47 @@ const DNAHelixCanvas = () => {
 };
 
 // ── Premium Log Entry Card ──────────────────────────────────────────────────
-const PremiumLogEntry = ({ entry, role }) => {
+const PremiumLogEntry = ({ entry, role, isOpen, onToggle }) => {
   const isUser = role === 'user';
   
   const displayText = isUser 
     ? entry.text 
     : (entry.text && entry.text.length > 65 ? entry.text.substring(0, 65) + '...' : entry.text) || 'Processing cognitive intent...';
 
+  const handleToggle = () => {
+    if (!isUser && entry.steps?.length > 0) {
+      if (onToggle) onToggle();
+      if (!isOpen) playTikTik();
+    }
+  };
+
+  const getStepIcon = (step) => {
+    if (step.status === 'done') return <FiCheckCircle />;
+    const lbl = step.label.toLowerCase();
+    if (lbl.includes('analyze') || lbl.includes('search')) return <FiSearch />;
+    if (lbl.includes('response') || lbl.includes('reply')) return <FiMessageSquare />;
+    if (lbl.includes('memory') || lbl.includes('database')) return <FiDatabase />;
+    if (lbl.includes('think') || lbl.includes('synthesize') || lbl.includes('cognitive')) return <FaBrain />;
+    if (lbl.includes('network') || lbl.includes('api') || lbl.includes('fetch')) return <FaNetworkWired />;
+    if (lbl.includes('parse') || lbl.includes('logic')) return <FaCodeBranch />;
+    if (lbl.includes('generate') || lbl.includes('create')) return <FaMagic />;
+    if (lbl.includes('idea') || lbl.includes('plan')) return <FaRegLightbulb />;
+    if (step.status === 'running') return <FiLoader className="spinning-icon" />;
+    return <FiActivity />;
+  };
+
   return (
-    <div className={`premium-log-entry compact ${isUser ? 'user' : 'ai'}`}>
-      <div className="premium-log-card">
+    <div className={`premium-log-entry compact ${isUser ? 'user' : 'ai'} ${isOpen ? 'expanded' : ''}`}>
+      <div className="premium-log-card" onClick={handleToggle}>
         <div className="premium-log-meta">
           <div className="meta-left">
             <div className={`meta-icon ${isUser ? 'user' : 'ai'}`}>
               {isUser ? (
-                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2.5" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.5" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               ) : (
-                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" strokeWidth="2.5" fill="none"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/></svg>
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2.5" fill="none"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/></svg>
               )}
             </div>
-            <span className="meta-role">{isUser ? 'OPERATOR' : 'ARIA CORE'}</span>
           </div>
           <span className="meta-time">{entry.time}</span>
         </div>
@@ -213,14 +255,20 @@ const PremiumLogEntry = ({ entry, role }) => {
         <p className="premium-text">{displayText || <span className="typing-cursor">▌</span>}</p>
 
         {!isUser && entry.steps && entry.steps.length > 0 && (
-          <div className="premium-steps-panel static">
+          <div className="premium-expand-hint">
+            {isOpen ? 'Hide steps ▴' : 'View internal logs ▾'}
+          </div>
+        )}
+
+        {isOpen && !isUser && entry.steps && entry.steps.length > 0 && (
+          <div className="premium-steps-timeline">
             {entry.steps.map((s, i) => (
-              <div key={i} className={`premium-step ${s.status}`}>
-                <div className="step-dot" />
-                <span className="step-label">{s.label}</span>
-                <span className="step-status-icon">
-                  {s.status === 'done' ? '✓' : s.status === 'running' ? '⟳' : '○'}
-                </span>
+              <div key={i} className={`timeline-step ${s.status}`}>
+                <div className="timeline-icon">{getStepIcon(s)}</div>
+                <div className="timeline-content">
+                  <span className="step-label">{s.label}</span>
+                  {s.status === 'running' && <span className="step-running-dot" />}
+                </div>
               </div>
             ))}
           </div>
@@ -233,6 +281,7 @@ const PremiumLogEntry = ({ entry, role }) => {
 // ── Logs Page (Unified Scrolling Architecture) ───────────────────────────────
 const Logs = () => {
   const [msgs, setMsgs] = useState([]);
+  const [expandedId, setExpandedId] = useState(null);
   const scrollRef = useRef(null);
 
   const refresh = useCallback(async () => {
@@ -338,7 +387,14 @@ const Logs = () => {
             </div>
             <div className="row-col center-gap"></div>
             <div className="row-col ai-col-item">
-              {interaction.ai && <PremiumLogEntry entry={interaction.ai} role="ai" />}
+              {interaction.ai && (
+                <PremiumLogEntry 
+                  entry={interaction.ai} 
+                  role="ai" 
+                  isOpen={expandedId === interaction.ai.id}
+                  onToggle={() => setExpandedId(expandedId === interaction.ai.id ? null : interaction.ai.id)}
+                />
+              )}
             </div>
           </div>
         ))}
