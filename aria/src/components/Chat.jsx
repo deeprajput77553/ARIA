@@ -113,15 +113,23 @@ const Chat = ({ onNavigate }) => {
     }
   };
 
-  const clearChat = async () => {
-    if (window.confirm('Are you sure you want to clear all messages?')) {
-      try {
-        await DB.clearMessages();
-        setMsgs([]); // Force local update
-        msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE); // Notify others (Logs)
-      } catch (err) {
-        console.error('Failed to clear messages:', err);
-      }
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  const handleClearClick = async () => {
+    if (!confirmClear) {
+      setConfirmClear(true);
+      setTimeout(() => setConfirmClear(false), 3000); // Reset after 3s
+      return;
+    }
+    
+    // Confirmed
+    try {
+      await DB.clearMessages();
+      setMsgs([]); // Force local update
+      msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE); // Notify others (Logs)
+      setConfirmClear(false);
+    } catch (err) {
+      console.error('Failed to clear messages:', err);
     }
   };
 
@@ -143,7 +151,11 @@ const Chat = ({ onNavigate }) => {
           </div>
         </div>
         <div className="cf-header-right">
-          <button className="cf-icon-btn cf-clear" onClick={clearChat} title="Clear Chat" style={{ marginRight: '15px', color: 'rgba(255,255,255,0.4)' }}>
+          <button 
+            className={`cf-icon-btn cf-clear ${confirmClear ? 'confirming' : ''}`} 
+            onClick={handleClearClick} 
+            title={confirmClear ? "Click again to confirm" : "Clear Chat"}
+          >
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M19 6L18 19a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
               <path d="M10 11v6M14 11v6M4 6h16M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />

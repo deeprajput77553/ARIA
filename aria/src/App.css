@@ -710,7 +710,9 @@
 }
 .cf-icon-btn:hover { background:rgba(255,255,255,0.12); color:white; }
 .cf-close:hover   { background:rgba(239,68,68,0.2); border-color:rgba(239,68,68,0.4); color:#f87171; }
+.cf-clear { margin-right: 15px; color: rgba(255,255,255,0.4); }
 .cf-clear:hover   { background:rgba(234,179,8,0.15); border-color:rgba(234,179,8,0.3); color:#fde047; }
+.cf-clear.confirming { background: rgba(239,68,68,0.2); border-color: rgba(239,68,68,0.4); color: #f87171; }
 
 /* Messages */
 .cf-messages {
