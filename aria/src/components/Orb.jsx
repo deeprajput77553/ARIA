@@ -144,7 +144,8 @@ const layerFragmentShader = `
 `;
 
 import { loadSettings } from './SettingsPage';
-import { speakFemale, loadLog, saveLog } from './Logs';
+import { speakFemale } from './Logs';
+import { DB } from '../storage/Database.js';
 import { loadProfile, buildProactiveGreeting } from '../storage/UserProfile';
 import { startProactiveMonitor, stopProactiveMonitor, buildContextualGreeting } from '../storage/ProactiveEngine';
 import { scheduleDecayRunner } from '../storage/DecayRunner';
@@ -250,12 +251,28 @@ const Orb = ({ onStateChange, onNavigate }) => {
     // Delay 1.5s so the orb finishes rendering first
     const timer = setTimeout(async () => {
       const p    = await loadProfile();
-      const text = buildProactiveGreeting(p);
-      setResponse(text);
-      setShowResponse(true);
-      setOrbState(2);
-      speakFemale(text, loadSettings());
-      setTimeout(() => setOrbState(0), 1200);
+      const msgs = await DB.getMessages();
+      
+      // Only greet if no messages in DB or if last message was long ago
+      if (msgs.length === 0) {
+        const text = buildProactiveGreeting(p);
+        setResponse(text);
+        setShowResponse(true);
+        setOrbState(2);
+        speakFemale(text, loadSettings());
+        
+        // Save to DB so it shows in Logs
+        await DB.putMessage({
+          id: Date.now(),
+          role: 'ai',
+          text: text,
+          time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+          timestamp: Date.now(),
+          steps: [{ label: 'Cognitive startup', status: 'done' }, { label: 'Greeting generated', status: 'done' }]
+        });
+        
+        setTimeout(() => setOrbState(0), 1200);
+      }
     }, 1500);
 
     // Start proactive background monitor

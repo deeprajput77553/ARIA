@@ -16,6 +16,8 @@ import {
   loadProfile, saveProfile, extractProfileFromMessage,
   mergeProfileData, buildProfileContext, trackTopic,
 } from './UserProfile.js';
+import { detectBuildIntent, runSandboxPipeline, isSandboxAvailable } from './SandboxEngine.js';
+import { msgBus, BUS_EVENTS } from './MessageBus.js';
 
 const OLLAMA = 'http://localhost:11434/api/generate';
 
@@ -26,6 +28,16 @@ export const WORKFLOW_STEPS = [
   { id: 'knowledge', label: 'Querying knowledge graph' },
   { id: 'generate',  label: 'Generating response'      },
   { id: 'memory',    label: 'Updating memory'          },
+];
+
+// ── Sandbox Workflow Steps ─────────────────────────────────────────────────────
+export const SANDBOX_STEPS = [
+  { id: 'analyze',  label: '🔍 Analyzing request'        },
+  { id: 'generate', label: '✍️ Generating code'           },
+  { id: 'write',    label: '📝 Writing files'            },
+  { id: 'test',     label: '🧪 Running in sandbox'       },
+  { id: 'fix',      label: '🔧 Auto-fixing errors'       },
+  { id: 'link',     label: '🔗 Registering capability'   },
 ];
 
 function mkStep(id, label, status = 'pending') {
@@ -42,11 +54,46 @@ function mkStep(id, label, status = 'pending') {
  */
 export async function runWorkflow(userText, model, onStepUpdate, onToken) {
   const steps = WORKFLOW_STEPS.map(s => mkStep(s.id, s.label));
-  const update = (id, status) => {
+  const update = (id, status, extra) => {
     const idx = steps.findIndex(s => s.id === id);
-    if (idx >= 0) steps[idx] = { ...steps[idx], status };
+    if (idx >= 0) steps[idx] = { ...steps[idx], status, ...(extra||{}) };
     onStepUpdate([...steps]);
+    // Broadcast so Orb sees Chat updates and vice versa
+    msgBus.emit(BUS_EVENTS.STEP_UPDATE, { steps });
   };
+
+  // ── Sandbox detection: does the user want to BUILD something? ─────────────
+  const buildIntent = detectBuildIntent(userText);
+  if (buildIntent.detected) {
+    const sandboxAvailable = await isSandboxAvailable();
+    if (sandboxAvailable) {
+      // Replace workflow steps with sandbox steps
+      const sandboxSteps = SANDBOX_STEPS.map(s => mkStep(s.id, s.label));
+      onStepUpdate(sandboxSteps);
+
+      // Build a human description first
+      const introResponse = `On it, Sir. I'll build that for you now. Watch the steps below — I'm coding it from scratch.`;
+      onToken(introResponse);
+
+      // Run the full pipeline
+      const result = await runSandboxPipeline(userText, model, (step) => {
+        const idx = sandboxSteps.findIndex(s => s.id === step.phase);
+        if (idx >= 0) sandboxSteps[idx] = { ...sandboxSteps[idx], status: step.status, output: step.output };
+        onStepUpdate([...sandboxSteps]);
+      });
+
+      const finalResponse = result.success
+        ? `Done, Sir. I've built and tested the capability for "${userText}". The files are in the workspace and registered in my knowledge graph. ${result.output ? `Output: ${result.output.slice(0,200)}` : ''}`
+        : `I ran into an issue, Sir: ${result.error}. I'll keep that logged so I can try again.`;
+
+      onToken(finalResponse);
+      return { fullResponse: finalResponse, steps: sandboxSteps };
+    } else {
+      // Sandbox server not running — inform user
+      onToken(`I'd love to build that for you, Sir. To enable self-coding, please start the ARIA server: \n\n\`node aria-server.js\`\n\nOnce that's running, ask me again.`);
+      return { fullResponse: 'Sandbox server offline', steps };
+    }
+  }
 
   // ── Level 1: Intent Classification ─────────────────────────────────────────
   update('intent', 'running');
