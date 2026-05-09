@@ -1,77 +1,75 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { AriaStore, FILE_TYPE } from '../storage/AriaStore';
 import { loadSettings } from './SettingsPage';
-import { speakFemale } from './Logs';
+import { speakFemale, loadLog, saveLog, LOG_KEY } from './Logs';
 
-const CHAT_KEY = 'main';
-const now = () => new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+const nowStr = () => new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
 
-const INIT = [
-  { id:1, role:'ai', text:'Hello — ARIA online. Ask me anything.', time:'00:00',
-    steps:[{label:'System initialized',status:'done'}] }
-];
+function getGreeting() {
+  const h   = new Date().getHours();
+  const day = new Date().toLocaleDateString('en-US',{weekday:'long'});
+  if (h>=5  && h<12) return `Good morning! It's ${day}. I'm ARIA — what can I help you with today?`;
+  if (h>=12 && h<17) return `Good afternoon! Happy ${day}. How can I assist?`;
+  if (h>=17 && h<21) return `Good evening! Hope your ${day} went well. What's on your mind?`;
+  return `Hello! Working late on ${day}? I'm always here for you.`;
+}
 
-// ── Single message bubble ─────────────────────────────────────────────────────
+// ── Message Bubble ────────────────────────────────────────────────────────────
 const Bubble = ({ msg }) => {
   const [open, setOpen] = useState(false);
   const isAI = msg.role === 'ai';
   return (
-    <div className={`chat-bubble-wrap ${isAI ? 'ai-side' : 'user-side'}`}>
-      <div className={`chat-bubble ${isAI?'chat-bubble-ai':'chat-bubble-user'}`}
-           onClick={() => msg.steps && setOpen(o=>!o)}>
-        <div className="chat-bubble-meta">
-          <span className="chat-bubble-role">{isAI ? '⬡ ARIA' : '👤 You'}</span>
-          <span className="chat-bubble-time">{msg.time}</span>
-          {msg.steps && <span style={{marginLeft:'auto',fontSize:'10px'}}>{open?'▴':'▾'}</span>}
+    <div className={`cf-wrap ${isAI ? 'cf-ai-wrap' : 'cf-user-wrap'}`}>
+      <div className="cf-avatar">{isAI ? '⬡' : '👤'}</div>
+      <div className="cf-bubble" onClick={() => msg.steps && setOpen(o=>!o)}>
+        <div className="cf-meta">
+          <span className="cf-role">{isAI ? 'ARIA' : 'You'}</span>
+          <span className="cf-time">{msg.time}</span>
+          {msg.steps && <span className="cf-chevron">{open?'▴':'▾'}</span>}
         </div>
-        <p className="chat-bubble-text">
-          {msg.text || <span className="typing-cursor">▌</span>}
-        </p>
+        <p className="cf-text">{msg.text || <span className="typing-cursor">▌</span>}</p>
+        {open && msg.steps && (
+          <div className="cf-steps">
+            {msg.steps.map((s,i) => (
+              <div key={i} className={`cf-step ${s.status}`}>
+                <span>{s.status==='done'?'✓':s.status==='running'?'⟳':'○'}</span>
+                <span>{s.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-      {open && msg.steps && (
-        <div className="chat-steps">
-          {msg.steps.map((s,i) => (
-            <div key={i} className={`chat-step ${s.status}`}>
-              <span>{s.status==='done'?'✓':s.status==='running'?'⟳':'○'}</span>
-              <span>{s.label}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
 
-// ── Main Chat Component ───────────────────────────────────────────────────────
+// ── Chat Component ────────────────────────────────────────────────────────────
 const Chat = ({ onClose }) => {
   const settings = loadSettings();
-  const [msgs,    setMsgs]    = useState(INIT);
+  const [msgs,    setMsgs]    = useState([]);
   const [input,   setInput]   = useState('');
   const [loading, setLoading] = useState(false);
-  const [loaded,  setLoaded]  = useState(false);
   const bottomRef = useRef(null);
   const inputRef  = useRef(null);
 
-  // ── Load history from IndexedDB on mount ─────────────────────────────────
+  // Load shared log + greet if empty
   useEffect(() => {
-    AriaStore.load('chat', CHAT_KEY, INIT).then(saved => {
-      setMsgs(saved && saved.length ? saved : INIT);
-      setLoaded(true);
-    });
-    setTimeout(() => inputRef.current?.focus(), 300);
+    const existing = loadLog();
+    if (existing && existing.length > 0) {
+      setMsgs(existing);
+    } else {
+      const greeting = {
+        id: Date.now(), role:'ai', text: getGreeting(), time: nowStr(),
+        steps:[{label:'Context evaluated',status:'done'},{label:'Greeting generated',status:'done'}]
+      };
+      const initial = [greeting];
+      setMsgs(initial);
+      saveLog(initial);
+    }
+    setTimeout(() => inputRef.current?.focus(), 200);
   }, []);
 
-  // ── Persist to IndexedDB whenever msgs change ─────────────────────────────
-  useEffect(() => {
-    if (loaded) AriaStore.save('chat', CHAT_KEY, msgs);
-  }, [msgs, loaded]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:'smooth' }); }, [msgs]);
 
-  // ── Scroll to bottom ──────────────────────────────────────────────────────
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [msgs]);
-
-  // ── Send message ──────────────────────────────────────────────────────────
   const send = useCallback(async () => {
     const text = input.trim();
     if (!text || loading) return;
@@ -80,91 +78,91 @@ const Chat = ({ onClose }) => {
 
     const userId = Date.now();
     const aiId   = userId + 1;
+    const userMsg = { id:userId, role:'user', text, time:nowStr() };
+    const aiMsg   = {
+      id:aiId, role:'ai', text:'', time:nowStr(),
+      steps:[
+        {label:'Parsing intent',      status:'running'},
+        {label:'Querying knowledge',  status:'pending'},
+        {label:'Generating response', status:'pending'},
+      ]
+    };
 
-    setMsgs(prev => [
-      ...prev,
-      { id: userId, role:'user', text, time: now() },
-      { id: aiId,   role:'ai',  text:'', time: now(),
-        steps:[
-          {label:'Parsing intent',     status:'running'},
-          {label:'Querying knowledge', status:'pending'},
-          {label:'Generating response',status:'pending'},
-        ]
-      },
-    ]);
-
-    const upd = (steps) => setMsgs(p => p.map(m => m.id===aiId ? {...m,steps} : m));
+    setMsgs(prev => { const u=[...prev,userMsg,aiMsg]; saveLog(u); return u; });
 
     try {
       const res = await fetch('http://localhost:11434/api/generate', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ model: settings.model||'llama3.2', prompt: text, stream:true }),
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ model:settings.model||'llama3.2', prompt:text, stream:true }),
       });
 
-      upd([
-        {label:'Parsing intent',     status:'done'},
-        {label:'Querying knowledge', status:'running'},
-        {label:'Generating response',status:'pending'},
-      ]);
+      setMsgs(prev => prev.map(m => m.id===aiId ? {...m, steps:[
+        {label:'Parsing intent',      status:'done'},
+        {label:'Querying knowledge',  status:'running'},
+        {label:'Generating response', status:'pending'},
+      ]} : m));
 
       const reader = res.body.getReader();
       const dec    = new TextDecoder();
       let full     = '';
 
       while (true) {
-        const {done, value} = await reader.read();
+        const {done,value} = await reader.read();
         if (done) break;
         for (const line of dec.decode(value).split('\n').filter(Boolean)) {
           try {
             const j = JSON.parse(line);
             if (j.response) {
               full += j.response;
-              setMsgs(p => p.map(m => m.id===aiId ? {...m, text:full} : m));
+              setMsgs(prev => { const u=prev.map(m=>m.id===aiId?{...m,text:full}:m); saveLog(u); return u; });
             }
           } catch {}
         }
       }
 
-      upd([
-        {label:'Parsing intent',     status:'done'},
-        {label:'Querying knowledge', status:'done'},
-        {label:'Generating response',status:'done'},
-      ]);
+      setMsgs(prev => { const u=prev.map(m=>m.id===aiId?{...m,steps:[
+        {label:'Parsing intent',      status:'done'},
+        {label:'Querying knowledge',  status:'done'},
+        {label:'Generating response', status:'done'},
+      ]}:m); saveLog(u); return u; });
       speakFemale(full, settings);
-
     } catch {
-      setMsgs(p => p.map(m => m.id===aiId
-        ? {...m, text:'⚠ Ollama offline. Run: ollama serve'}
-        : m
-      ));
+      setMsgs(prev => { const u=prev.map(m=>m.id===aiId?{...m,text:'⚠ Ollama offline — run: ollama serve'}:m); saveLog(u); return u; });
     }
     setLoading(false);
   }, [input, loading, settings]);
 
   const onKey = e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
 
-  // ── Clear history ─────────────────────────────────────────────────────────
   const clearHistory = () => {
-    if (confirm('Clear all chat history?')) { setMsgs(INIT); }
+    if (confirm('Clear all chat history?')) {
+      const greeting = {
+        id:Date.now(), role:'ai', text:getGreeting(), time:nowStr(),
+        steps:[{label:'Context evaluated',status:'done'},{label:'Greeting generated',status:'done'}]
+      };
+      const initial = [greeting];
+      setMsgs(initial); saveLog(initial);
+    }
   };
 
   return (
-    <div className="chat-overlay">
+    <div className="chat-fullscreen">
       {/* Header */}
-      <div className="chat-header">
-        <div className="chat-header-left">
-          <div className="chat-orb-dot"/>
-          <span className="chat-title">ARIA Chat</span>
-          <span className="chat-subtitle">Autonomous Intelligence</span>
+      <div className="cf-header">
+        <div className="cf-header-left">
+          <div className="cf-orb-dot"/>
+          <div>
+            <div className="cf-title">ARIA Chat</div>
+            <div className="cf-subtitle">Autonomous · Reasoning · Integration · Agent</div>
+          </div>
         </div>
-        <div className="chat-header-actions">
-          <button className="chat-action-btn" onClick={clearHistory} title="Clear history">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <div className="cf-header-right">
+          <button className="cf-icon-btn" onClick={clearHistory} title="Clear history">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
             </svg>
           </button>
-          <button className="chat-close-btn" onClick={onClose} title="Back to Orb">
+          <button className="cf-icon-btn cf-close" onClick={onClose} title="Close">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
@@ -173,11 +171,12 @@ const Chat = ({ onClose }) => {
       </div>
 
       {/* Messages */}
-      <div className="chat-messages">
+      <div className="cf-messages">
         {msgs.map(m => <Bubble key={m.id} msg={m}/>)}
         {loading && (
-          <div className="chat-bubble-wrap ai-side">
-            <div className="chat-bubble chat-bubble-ai">
+          <div className="cf-wrap cf-ai-wrap">
+            <div className="cf-avatar">⬡</div>
+            <div className="cf-bubble">
               <div className="typing-dots"><span/><span/><span/></div>
             </div>
           </div>
@@ -186,10 +185,10 @@ const Chat = ({ onClose }) => {
       </div>
 
       {/* Input */}
-      <div className="chat-input-bar">
+      <div className="cf-input-bar">
         <textarea
           ref={inputRef}
-          className="chat-textarea"
+          className="cf-textarea"
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={onKey}
@@ -197,7 +196,7 @@ const Chat = ({ onClose }) => {
           rows={2}
           disabled={loading}
         />
-        <button className="chat-send-btn" onClick={send} disabled={loading || !input.trim()}>
+        <button className="cf-send-btn" onClick={send} disabled={loading || !input.trim()}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="22" y1="2" x2="11" y2="13"/>
             <polygon points="22 2 15 22 11 13 2 9 22 2"/>
