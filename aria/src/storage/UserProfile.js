@@ -24,6 +24,7 @@ export const EMPTY_PROFILE = {
   activity_hours: [],
   last_topics: [],
   session_count: 0,
+  gender: null, // 'male' | 'female' | null
   first_seen: Date.now(),
   notes: [],
 };
@@ -43,7 +44,11 @@ export async function saveProfile(profile) {
 export function buildProfileContext(profile) {
   if (!profile) return '';
   const lines = ['[ARIA USER PROFILE — loaded from memory]'];
+  const salutation = profile.gender === 'male' ? 'Sir' : profile.gender === 'female' ? 'Ma\'am' : 'Sir/Ma\'am';
+  
   if (profile.name)       lines.push(`User name: ${profile.name}`);
+  if (profile.gender)     lines.push(`User gender: ${profile.gender}`);
+  lines.push(`Preferred Salutation: ${salutation}`);
   if (profile.occupation) lines.push(`Occupation: ${profile.occupation}`);
   if (profile.location)   lines.push(`Location: ${profile.location}`);
   if (profile.interests?.length) lines.push(`Known interests: ${profile.interests.join(', ')}`);
@@ -66,11 +71,13 @@ Current known profile:
 ${JSON.stringify(currentProfile, null, 2)}
 
 Extract any NEW personal information from the message that would help personalize future responses.
-Only extract information explicitly mentioned. Do NOT hallucinate or guess.
+Only extract information explicitly mentioned. 
+IMPORTANT: If the user provides their name, or if you already have their name in the profile, infer the gender ('male' or 'female') if possible.
 
 Return ONLY a JSON object with these optional fields (omit fields you can't extract):
 {
   "name": "string or null",
+  "gender": "male | female | null",
   "occupation": "string or null", 
   "location": "string or null",
   "interests": ["array of new interests to ADD"],
@@ -105,6 +112,7 @@ export function mergeProfileData(existing, extracted) {
   if (extracted.name       && !merged.name)       merged.name       = extracted.name;
   if (extracted.occupation && !merged.occupation) merged.occupation = extracted.occupation;
   if (extracted.location   && !merged.location)   merged.location   = extracted.location;
+  if (extracted.gender     && !merged.gender)     merged.gender     = extracted.gender;
   if (extracted.interests?.length) {
     merged.interests = [...new Set([...( merged.interests||[]), ...extracted.interests])];
   }
@@ -127,15 +135,16 @@ export function trackTopic(profile, topic) {
 export function buildProactiveGreeting(profile) {
   const h    = new Date().getHours();
   const day  = new Date().toLocaleDateString('en-US', { weekday:'long' });
-  const name = profile?.name ? `, ${profile.name}` : '';
+  const sal  = profile.gender === 'male' ? 'Sir' : profile.gender === 'female' ? 'Ma\'am' : 'Sir'; // Default to Sir if unknown
+  const name = profile?.name ? ` ${profile.name}` : '';
 
-  if (h >= 5  && h < 9)  return `Good morning${name}! It's ${day} — ready to get started?`;
-  if (h >= 9  && h < 12) return `Hey${name}! It's a ${day} morning. What are we working on?`;
-  if (h >= 12 && h < 14) return `Afternoon${name}. Taking a break or diving in?`;
-  if (h >= 14 && h < 17) return `Hey${name} — ${day} afternoon. Still on track?`;
-  if (h >= 17 && h < 20) return `Evening${name}. Wrapping up for the day or something on your mind?`;
-  if (h >= 20 && h < 23) return `Late evening${name}. Anything you want to capture before you sleep?`;
-  return `Hey${name}, you're up late on ${day}. Something on your mind?`;
+  if (h >= 5  && h < 9)  return `Good morning, ${sal}${name}! It's ${day} — ready to get started?`;
+  if (h >= 9  && h < 12) return `Hey ${sal}${name}! It's a ${day} morning. What are we working on?`;
+  if (h >= 12 && h < 14) return `Afternoon, ${sal}${name}. Taking a break or diving in?`;
+  if (h >= 14 && h < 17) return `Hey ${sal}${name} — ${day} afternoon. Still on track?`;
+  if (h >= 17 && h < 20) return `Evening, ${sal}${name}. Wrapping up for the day or something on your mind?`;
+  if (h >= 20 && h < 23) return `Late evening, ${sal}${name}. Anything you want to capture before you sleep?`;
+  return `Hey ${sal}${name}, you're up late on ${day}. Something on your mind?`;
 }
 
 // ── Increment session count ───────────────────────────────────────────────────
