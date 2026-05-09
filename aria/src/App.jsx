@@ -6,8 +6,6 @@ import Logs from './components/Logs';
 import Chat from './components/Chat';
 import AuthPage from './components/AuthPage';
 import SettingsPage from './components/SettingsPage';
-import KnowledgeGraph from './components/KnowledgeGraph';
-import AuditLog from './components/AuditLog';
 import './App.css';
 
 function App() {
@@ -33,8 +31,6 @@ function App() {
         {screen === 'orb'      && <Orb onNavigate={navigate}/>}
         {screen === 'chat'     && <Chat onNavigate={navigate}/>}
         {screen === 'logs'     && <Logs/>}
-        {screen === 'graph'    && <KnowledgeGraph/>}
-        {screen === 'audit'    && <AuditLog/>}
         {screen === 'settings' && <SettingsPage/>}
       </main>
     </div>

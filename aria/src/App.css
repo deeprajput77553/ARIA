@@ -21,14 +21,13 @@
 /* ── NAVBAR ────────────────────────────────────────── */
 /* ── NAVBAR ────────────────────────────────────────── */
 .navbar {
-  width: 240px; height: 100vh;
-  background: rgba(13, 8, 28, 0.85);
-  backdrop-filter: blur(20px);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  width: 200px; height: 100vh;
+  background: #07040f;
+  border-right: 1px solid rgba(255, 255, 255, 0.04);
   display: flex; flex-direction: column;
-  padding: 24px 16px; gap: 40px;
+  padding: 30px 16px; gap: 40px;
   position: relative; z-index: 200;
-  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   flex-shrink: 0;
 }
 
@@ -78,19 +77,20 @@
 }
 .nav-btn:hover { background: rgba(255, 255, 255, 0.04); color: white; }
 .nav-btn.active {
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, rgba(37, 99, 235, 0.1) 100%);
-  color: #a78bfa; box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.2);
+  background: rgba(124, 58, 237, 0.08);
+  color: #a78bfa;
+  box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.15);
+  border-radius: 10px;
 }
 
 .navbar-user-section { margin-top: auto; }
 .navbar-user {
   display: flex; align-items: center; gap: 12px;
-  padding: 8px; border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
+  padding: 8px 4px;
   cursor: pointer; position: relative;
-  transition: background 0.2s;
+  transition: opacity 0.2s;
 }
-.navbar-user:hover { background: rgba(255, 255, 255, 0.06); }
+.navbar-user:hover { opacity: 0.8; }
 .user-name-small { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.8); }
 
 @media (max-width: 768px) {
@@ -281,9 +281,11 @@
 .dna-chat-page {
   display: grid;
   grid-template-columns: 1fr clamp(180px, 22vw, 300px) 1fr;
-  height: 100%;
+  height: 100vh;
+  width: 100%;
   overflow: hidden;
-  background: #07040f;
+  background: #05030a;
+  position: relative;
 }
 @media (max-width: 700px) {
   .dna-chat-page {
@@ -315,19 +317,15 @@
 }
 
 .col-header {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
-  font-weight: 600; color: rgba(255,255,255,0.4);
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-  flex-shrink: 0;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.12em;
+  text-transform: uppercase; color: rgba(255,255,255,0.45);
+  padding: 12px 0 20px;
 }
-.col-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  animation: col-pulse 2.5s ease-in-out infinite;
-}
-.ai-dot   { background: #38bdf8; box-shadow: 0 0 8px #38bdf8; }
-.user-dot { background: #f472b6; box-shadow: 0 0 8px #f472b6; }
+.col-dot { width: 8px; height: 8px; border-radius: 50%; }
+.user-dot { background: #f472b6; box-shadow: 0 0 10px #f472b6; }
+.ai-dot   { background: #38bdf8; box-shadow: 0 0 10px #38bdf8; }
+
 @keyframes col-pulse {
   0%,100% { opacity: 1; transform: scale(1); }
   50%     { opacity: 0.6; transform: scale(0.8); }
@@ -654,136 +652,13 @@
 }
 .settings-save-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 28px rgba(124,58,237,0.5); }
 
-/* ── LOG ENTRY V2 — Premium Glass Cards ─────────────────── */
-.log-entry-v2 {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 16px;
-  padding: 11px 14px 10px;
-  font-size: clamp(11px,1.15vw,13px);
-  line-height: 1.55;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  transition: all 0.4s cubic-bezier(0.16,1,0.3,1);
-  animation: msg-in 0.38s cubic-bezier(0.16,1,0.3,1) both;
-}
 
-.log-entry-v2.focused {
-  background: rgba(255,255,255,0.07);
-  box-shadow: 0 8px 32px rgba(124,58,237,0.12);
-}
-
-.log-entry-v2.user.focused {
-  border-color: rgba(0,140,255,0.35);
-  box-shadow: 0 8px 28px rgba(0,140,255,0.12);
-}
-
-.log-entry-v2.ai.focused {
-  border-color: rgba(220,30,80,0.3);
-  box-shadow: 0 8px 28px rgba(220,30,80,0.1);
-}
-
-/* Header */
-.lev2-header {
-  display: flex; align-items: center; gap: 7px;
-  margin-bottom: 7px;
-}
-
-.lev2-avatar {
-  width: 22px; height: 22px; border-radius: 7px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; flex-shrink: 0;
-}
-
-.log-entry-v2.user .lev2-avatar { border-color: rgba(0,140,255,0.3); }
-.log-entry-v2.ai   .lev2-avatar { border-color: rgba(220,30,80,0.3); }
-
-.lev2-role {
-  font-size: 9.5px; font-weight: 800;
-  text-transform: uppercase; letter-spacing: 0.1em;
-  color: rgba(255,255,255,0.4);
-}
-
-.lev2-time {
-  font-size: 9px; color: rgba(255,255,255,0.2);
-  margin-left: auto; font-variant-numeric: tabular-nums;
-}
-
-.lev2-steps-btn {
-  background: none; border: 1px solid rgba(255,255,255,0.1);
-  color: rgba(255,255,255,0.35); font-size: 9px; padding: 2px 6px;
-  border-radius: 5px; cursor: pointer; transition: all 0.2s;
-}
-.lev2-steps-btn:hover { border-color: rgba(168,85,247,0.4); color: #a78bfa; }
-
-/* Message text */
-.lev2-body { padding: 0 2px; }
-.lev2-text {
-  margin: 0; color: rgba(255,255,255,0.85);
-  font-size: clamp(11px,1.15vw,13px); line-height: 1.6;
-  word-break: break-word;
-}
-
-/* Agent steps */
-.lev2-steps {
-  margin-top: 9px;
-  padding: 8px 10px;
-  background: rgba(0,0,0,0.3);
-  border-radius: 10px;
-  border-left: 2px solid rgba(168,85,247,0.4);
-  display: flex; flex-direction: column; gap: 5px;
-  animation: msg-in 0.3s ease-out both;
-}
-
-.lev2-step {
-  display: flex; align-items: center; gap: 7px;
-  font-size: 10.5px; color: rgba(255,255,255,0.45);
-}
-.lev2-step.done    { color: rgba(34,197,94,0.85); }
-.lev2-step.running { color: rgba(251,191,36,0.9); }
-.lev2-step.error   { color: rgba(239,68,68,0.9); }
-
-.lev2-step-icon { width: 13px; text-align: center; flex-shrink: 0; }
-.lev2-step.running .lev2-step-icon { animation: spin 1s linear infinite; display: inline-block; }
-.lev2-step-label { flex: 1; }
-.lev2-step-output {
-  font-size: 9px; color: rgba(255,255,255,0.2);
-  font-family: monospace; max-width: 120px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
-
-/* ── DNA SEND BUTTON ───────────────────────────────── */
-.dna-send-btn {
-  width: 42px; height: 42px; padding: 0;
-  border-radius: 12px; display: flex; align-items: center; justify-content: center;
-  background: rgba(79,172,254,0.08); border: 1px solid rgba(79,172,254,0.25);
-  transition: all 0.2s;
-}
-.dna-send-btn:hover:not(:disabled) {
-  background: rgba(79,172,254,0.18); border-color: rgba(79,172,254,0.5);
-  box-shadow: 0 0 16px rgba(79,172,254,0.25);
-}
-.dna-send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-/* ── LOG PLACEHOLDER ───────────────────────────────── */
-.log-placeholder {
-  padding: 10px 13px;
-  color: rgba(255,255,255,0.15);
-  font-size: 12px;
-  text-align: center;
-  letter-spacing: 0.1em;
-}
 
 /* ── FULL-SCREEN CHAT ──────────────────────────────── */
 .chat-fullscreen {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
+  position: relative;
+  width: 100%;
+  height: 100%;
   background: radial-gradient(circle at 50% 0%, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
               radial-gradient(circle at 0% 100%, rgba(56, 189, 248, 0.1) 0%, transparent 40%),
               radial-gradient(circle at 100% 100%, rgba(244, 114, 182, 0.08) 0%, transparent 40%),
@@ -835,6 +710,7 @@
 }
 .cf-icon-btn:hover { background:rgba(255,255,255,0.12); color:white; }
 .cf-close:hover   { background:rgba(239,68,68,0.2); border-color:rgba(239,68,68,0.4); color:#f87171; }
+.cf-clear:hover   { background:rgba(234,179,8,0.15); border-color:rgba(234,179,8,0.3); color:#fde047; }
 
 /* Messages */
 .cf-messages {
@@ -885,7 +761,7 @@
 }
 .cf-role    { font-weight:700; text-transform:uppercase; }
 .cf-chevron { margin-left:auto; cursor:pointer; }
-.cf-text    { margin:0; }
+.cf-text    { margin:0; white-space: pre-wrap; }
 
 .cf-steps {
   margin-top:10px; padding:8px 12px;
@@ -941,65 +817,7 @@
 
 
 
-/* ── DNA LOGS v2.0 PREMIUM ─────────────────────────── */
-.dna-chat-page {
-  position: relative;
-  width: 100%; height: 100vh;
-  background: #05030a;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
 
-.dna-helix-bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  opacity: 0.45;
-  filter: blur(10px);
-  pointer-events: none;
-}
-
-.dna-equator-guide {
-  position: absolute;
-  top: 50%; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(168,100,255,0.2), transparent);
-  z-index: 1;
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
-.turn-stack {
-  position: relative;
-  flex: 1;
-  z-index: 2;
-  perspective: 1200px;
-}
-
-.turn-row {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.turn-content-pair {
-  display: flex;
-  gap: 80px; /* Space for the center helix visually */
-  width: 90%;
-  max-width: 1100px;
-  justify-content: space-between;
-}
-
-.turn-side {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.user-side { align-items: flex-end; }
-.ai-side   { align-items: flex-start; }
 
 /* ── PREMIUM LOG CARDS ── */
 .premium-log-entry {
@@ -1009,59 +827,45 @@
 }
 
 .premium-log-card {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 24px;
-  padding: 18px 22px;
+  background: rgba(20, 15, 35, 0.4);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 18px;
+  padding: 16px 20px;
   cursor: pointer;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
 }
 
-.premium-log-card:hover {
-  border-color: rgba(168, 100, 255, 0.3);
-  background: rgba(255, 255, 255, 0.05);
+.user .premium-log-card {
+  background: rgba(244, 114, 182, 0.03);
+  border-color: rgba(244, 114, 182, 0.12);
 }
 
-.user .premium-log-card {
-  border-right-width: 3px;
-  border-right-color: rgba(0, 140, 255, 0.4);
+.meta-time {
+  font-size: 11px;
+  color: rgba(255,255,255,0.25);
+  margin-left: 8px;
 }
 
 .ai .premium-log-card {
-  border-left-width: 3px;
-  border-left-color: rgba(220, 30, 80, 0.4);
+  background: rgba(56, 189, 248, 0.04);
+  border-color: rgba(56, 189, 248, 0.12);
 }
 
-/* Focused state */
-.focused .premium-log-card {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 15px 50px rgba(124, 58, 237, 0.15);
-}
-
-.premium-log-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.meta-left { display: flex; align-items: center; gap: 10px; }
 .meta-icon {
-  width: 28px; height: 28px;
-  border-radius: 8px;
+  width: 24px; height: 24px;
+  border-radius: 6px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 14px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
+  font-size: 11px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
 }
-.meta-icon.user { color: #38bdf8; }
-.meta-icon.ai   { color: #f472b6; }
+.meta-icon.user { color: #f472b6; }
+.meta-icon.ai   { color: #38bdf8; }
 
 .meta-role {
   font-size: 11px;
@@ -1082,6 +886,7 @@
   line-height: 1.6;
   color: rgba(255,255,255,0.85);
   word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .premium-expand-hint {

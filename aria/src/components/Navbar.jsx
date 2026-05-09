@@ -59,7 +59,7 @@ const Navbar = ({ currentPage, onNavigate }) => {
       <div className="navbar-top">
         <div className="navbar-logo" onClick={() => nav('orb')}>
           <StarLogo size={34} />
-          <span className="navbar-title">ARIA</span>
+          <span className="navbar-title" style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '0.05em' }}>ARIA</span>
         </div>
         
         <button className="nav-toggle" onClick={() => setIsCollapsed(!isCollapsed)}>
@@ -71,45 +71,27 @@ const Navbar = ({ currentPage, onNavigate }) => {
 
       <div className="navbar-nav">
         <button className={`nav-btn ${currentPage === 'orb'  ? 'active' : ''}`} onClick={() => nav('orb')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="17" height="17">
-            <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor" opacity="0.4"/>
-            <path d="M12 3v2M12 19v2M3 12h2M19 12h2" strokeLinecap="round"/>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="18" height="18">
+            <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="currentColor" opacity="0.3"/>
           </svg>
           <span>Orb</span>
         </button>
         <button className={`nav-btn ${currentPage === 'chat' ? 'active' : ''}`} onClick={() => nav('chat')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="17" height="17">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="18" height="18">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           <span>Chats</span>
         </button>
         <button className={`nav-btn ${currentPage === 'logs' ? 'active' : ''}`} onClick={() => nav('logs')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="17" height="17">
-            <path d="M12 20h9M3 20h2M3 12h18M3 4h18" strokeLinecap="round" strokeLinejoin="round"/>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="18" height="18">
+            <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round"/>
           </svg>
           <span>Logs</span>
         </button>
-        <button className={`nav-btn ${currentPage === 'graph' ? 'active' : ''}`} onClick={() => nav('graph')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="17" height="17">
-            <circle cx="5"  cy="12" r="2"/><circle cx="19" cy="5"  r="2"/><circle cx="19" cy="19" r="2"/>
-            <circle cx="12" cy="12" r="2.5" fill="currentColor" opacity="0.4"/>
-            <line x1="7" y1="11.2" x2="10.2" y2="12" strokeLinecap="round"/>
-            <line x1="13.8" y1="11" x2="17.2" y2="6.2" strokeLinecap="round"/>
-            <line x1="13.8" y1="13" x2="17.2" y2="17.8" strokeLinecap="round"/>
-          </svg>
-          <span>Graph</span>
-        </button>
-        <button className={`nav-btn ${currentPage === 'audit' ? 'active' : ''}`} onClick={() => nav('audit')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="17" height="17">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <span>Audit</span>
-        </button>
         <button className={`nav-btn ${currentPage === 'settings' ? 'active' : ''}`} onClick={() => nav('settings')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="17" height="17">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="18" height="18">
             <circle cx="12" cy="12" r="3"/>
-            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" strokeLinecap="round"/>
+            <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" strokeLinecap="round"/>
           </svg>
           <span>Settings</span>
         </button>
