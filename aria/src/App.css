@@ -738,6 +738,19 @@
   font-size:16px; flex-shrink:0;
   background:rgba(255,255,255,0.06);
   border:1px solid rgba(255,255,255,0.1);
+  transition: all 0.3s ease;
+}
+.cf-avatar.ai-avatar {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+}
+.cf-avatar.user-avatar {
+  background: rgba(244, 114, 182, 0.15);
+  border-color: rgba(244, 114, 182, 0.4);
+  color: #f472b6;
+  box-shadow: 0 0 15px rgba(244, 114, 182, 0.2);
 }
 
 .cf-bubble {
@@ -776,7 +789,19 @@
   font-size:11px; color:rgba(255,255,255,0.5);
 }
 .cf-step.done    { color:rgba(34,197,94,0.9); }
-.cf-step.running { color:rgba(251,191,36,0.9); }
+.cf-step.running { color:rgba(56,189,248,0.9); }
+.cf-step.error   { color:rgba(239,68,68,0.9); }
+
+.spinning-icon {
+  animation: spin 1.5s linear infinite;
+}
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}
+.typing-cursor-inline {
+  display: inline-block;
+  animation: blink 1s step-end infinite;
+}
 
 /* Input bar */
 .cf-input-bar {

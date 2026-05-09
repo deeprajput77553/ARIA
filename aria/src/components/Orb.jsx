@@ -149,7 +149,7 @@ import { DB } from '../storage/Database.js';
 import { msgBus, BUS_EVENTS } from '../storage/MessageBus.js';
 
 // ─── OLLAMA API HOOK ──────────────────────────────────────────────────────────
-const useOllama = () => {
+export const useOllama = () => {
   const [isAvailable, setIsAvailable] = useState(false);
   const [model, setModel] = useState(() => loadSettings().model || 'llama3.2');
 
