@@ -3,11 +3,6 @@
  * 
  * Uses BroadcastChannel (browser-native) to sync message state
  * between Orb, Chat, and Logs without any server.
- * 
- * Usage:
- *   import { msgBus } from '../storage/MessageBus.js';
- *   msgBus.on('new_message', (msg) => setMsgs(prev => [...prev, msg]));
- *   msgBus.emit('new_message', msg);
  */
 
 class MessageBus {
@@ -40,11 +35,10 @@ class MessageBus {
 
 export const msgBus = new MessageBus();
 
-// ── Event types ────────────────────────────────────────────────────────────────
 export const BUS_EVENTS = {
-  NEW_MESSAGE:      'new_message',       // { message }
-  UPDATE_MESSAGE:   'update_message',    // { id, updates }
+  NEW_MESSAGE:      'new_message',       
+  UPDATE_MESSAGE:   'update_message',    
   MESSAGES_CLEARED: 'messages_cleared',
-  STEP_UPDATE:      'step_update',       // { messageId, steps }
-  SANDBOX_EVENT:    'sandbox_event',     // { phase, label, status, output }
+  STEP_UPDATE:      'step_update',       
+  SANDBOX_EVENT:    'sandbox_event',     
 };

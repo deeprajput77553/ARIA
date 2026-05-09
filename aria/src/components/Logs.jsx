@@ -1,4 +1,9 @@
+<<<<<<< HEAD
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+=======
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import DNALoader from './DNALoader';
+>>>>>>> 703a2f0 (Refine ARIA Logs with DB sync, restore original DNA, and stabilize chat integration)
 import { loadSettings } from './SettingsPage';
 import { DB } from '../storage/Database.js';
 import { msgBus, BUS_EVENTS } from '../storage/MessageBus.js';
@@ -37,7 +42,11 @@ export function speakFemale(text, settings) {
   window.speechSynthesis.speak(utt);
 }
 
+<<<<<<< HEAD
 // ── DNA Helix Canvas ─────────────────────────────────────────────────────────
+=======
+// ── DNA Helix Canvas (Original Section - Untouched) ────────────────────────
+>>>>>>> 703a2f0 (Refine ARIA Logs with DB sync, restore original DNA, and stabilize chat integration)
 const DNAHelixCanvas = () => {
   const ref  = useRef(null);
   const sRef = useRef({ phi:0, last:null, breathT:0 });
@@ -70,6 +79,7 @@ const LogEntry = ({ entry, side, isFocused }) => {
   const isUser = side === 'user';
 
   return (
+<<<<<<< HEAD
     <div className={`log-entry-v2 ${isUser ? 'user' : 'ai'} ${isFocused ? 'focused' : ''}`}>
       {/* Header row */}
       <div className="lev2-header">
@@ -81,6 +91,16 @@ const LogEntry = ({ entry, side, isFocused }) => {
             {open ? '▲' : '▼'} {entry.steps.length}
           </button>
         )}
+=======
+    <div className={`log-entry ${isUser?'log-user':'log-ai'}`} style={{'--delay':`${entry.delay||0}s`}}>
+      <div className="log-bubble" onClick={() => entry.steps && setOpen(o=>!o)}>
+        <div className="log-meta">
+          <span className="log-role">{isUser ? '👤 You' : '⬡ ARIA'}</span>
+          <span className="log-time">{entry.time}</span>
+          {entry.steps && <span className="log-expand">{open?'▴':'▾'}</span>}
+        </div>
+        <p className="log-text" style={{ whiteSpace: 'pre-wrap' }}>{entry.text || <span className="typing-cursor">▌</span>}</p>
+>>>>>>> 703a2f0 (Refine ARIA Logs with DB sync, restore original DNA, and stabilize chat integration)
       </div>
 
       {/* Message text */}
@@ -106,6 +126,7 @@ const LogEntry = ({ entry, side, isFocused }) => {
   );
 };
 
+<<<<<<< HEAD
 // ── Build turns: group log into [user, ai] pairs ──────────────────────────────
 function buildTurns(log) {
   const turns = [];
@@ -164,6 +185,103 @@ const Logs = () => {
         playChime();
         prevFocusRef.current = turns.length - 1;
       }
+=======
+// ── Logs Page ─────────────────────────────────────────────────────────────
+const Logs = () => {
+  const settings = loadSettings();
+  const [msgs, setMsgs] = useState([]);
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const aiListRef = useRef(null);
+  const userListRef = useRef(null);
+
+  const refresh = useCallback(async () => {
+    const data = await DB.getMessages();
+    setMsgs(data.sort((a, b) => (a.timestamp || a.id) - (b.timestamp || b.id)));
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    const unsubNew = msgBus.on(BUS_EVENTS.NEW_MESSAGE, refresh);
+    const unsubUpd = msgBus.on(BUS_EVENTS.UPDATE_MESSAGE, refresh);
+    return () => { unsubNew(); unsubUpd(); };
+  }, [refresh]);
+
+  const scrollBoth = useCallback(() => {
+    setTimeout(() => {
+      aiListRef.current?.scrollTo({ top: aiListRef.current.scrollHeight, behavior: 'smooth' });
+      userListRef.current?.scrollTo({ top: userListRef.current.scrollHeight, behavior: 'smooth' });
+    }, 100);
+  }, []);
+
+  useEffect(() => { scrollBoth(); }, [msgs, scrollBoth]);
+
+  const send = useCallback(async () => {
+    const text = input.trim();
+    if (!text || sending) return;
+    setInput('');
+    setSending(true);
+
+    const userMsg = await DB.addMessage('user', text);
+    msgBus.emit(BUS_EVENTS.NEW_MESSAGE, userMsg);
+
+    const aiMsg = await DB.addMessage('ai', '', [
+      { label: 'Parsing intent', status: 'done' },
+      { label: 'Querying knowledge', status: 'running' },
+      { label: 'Generating response', status: 'pending' },
+    ]);
+    msgBus.emit(BUS_EVENTS.NEW_MESSAGE, aiMsg);
+
+    try {
+      const res = await fetch('http://localhost:11434/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: settings.model || 'llama3.2', prompt: text, stream: true }),
+      });
+
+      await DB.updateMessage(aiMsg.id, {
+        steps: [
+          { label: 'Parsing intent', status: 'done' },
+          { label: 'Querying knowledge', status: 'done' },
+          { label: 'Generating response', status: 'running' },
+        ]
+      });
+      msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
+
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let full = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const lines = dec.decode(value).split('\n').filter(Boolean);
+        for (const line of lines) {
+          try {
+            const j = JSON.parse(line);
+            if (j.response) {
+              full += j.response;
+              await DB.updateMessage(aiMsg.id, { text: full });
+              msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
+            }
+          } catch {}
+        }
+      }
+
+      await DB.updateMessage(aiMsg.id, {
+        steps: [
+          { label: 'Parsing intent', status: 'done' },
+          { label: 'Querying knowledge', status: 'done' },
+          { label: 'Generating response', status: 'done' },
+        ]
+      });
+      msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
+      speakFemale(full, settings);
+    } catch {
+      await DB.updateMessage(aiMsg.id, { text: '⚠ Ollama offline — run: ollama serve' });
+      msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
+>>>>>>> 703a2f0 (Refine ARIA Logs with DB sync, restore original DNA, and stabilize chat integration)
     }
   });
 
@@ -205,6 +323,7 @@ const Logs = () => {
     };
   };
 
+<<<<<<< HEAD
   if (loading) return (
     <div className="dna-chat-page" style={{ alignItems:'center', justifyContent:'center' }}>
       <div style={{ fontSize:32, color:'#a78bfa', animation:'spin 1.5s linear infinite' }}>⬡</div>
@@ -234,10 +353,45 @@ const Logs = () => {
       </div>
 
       {/* ── Center: DNA helix ───────────────────────────── */}
-      <div className="dna-center">
-        <DNAHelixCanvas/>
+=======
+  const aiLog = msgs.filter(e => e.role === 'ai');
+  const userLog = msgs.filter(e => e.role === 'user');
+
+  return (
+    <div className="dna-chat-page">
+      <div className="dna-col user-col">
+        <div className="col-header">
+          <span className="col-dot user-dot" />
+          <span>User Logs</span>
+        </div>
+        <div className="message-list premium-scroll" ref={userListRef}>
+          {userLog.map(e => <LogEntry key={e.id} entry={e} side="user" />)}
+        </div>
+        <div className="chat-input-row">
+          <textarea
+            className="chat-input"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={onKey}
+            placeholder="Ask ARIA anything..."
+            rows={2}
+          />
+          <button
+            className="send-btn dna-send-btn"
+            onClick={send}
+            disabled={sending || !input.trim()}
+          >
+            <DNALoader size={22} running={sending} />
+          </button>
+        </div>
       </div>
 
+>>>>>>> 703a2f0 (Refine ARIA Logs with DB sync, restore original DNA, and stabilize chat integration)
+      <div className="dna-center">
+        <DNAHelixCanvas />
+      </div>
+
+<<<<<<< HEAD
       {/* ── Right: AI logs ──────────────────────────────── */}
       <div className="dna-col ai-col">
         <div className="col-header">
@@ -250,6 +404,20 @@ const Logs = () => {
               {turn.ai
                 ? <LogEntry entry={turn.ai} side="ai" isFocused={idx === focusedIdx}/>
                 : <div className="log-placeholder">—</div>}
+=======
+      <div className="dna-col ai-col">
+        <div className="col-header">
+          <span className="col-dot ai-dot" />
+          <span>AI Logs</span>
+        </div>
+        <div className="message-list premium-scroll" ref={aiListRef}>
+          {aiLog.map(e => <LogEntry key={e.id} entry={e} side="ai" />)}
+          {sending && (
+            <div className="log-entry log-ai">
+              <div className="log-bubble">
+                <div className="typing-dots"><span /><span /><span /></div>
+              </div>
+>>>>>>> 703a2f0 (Refine ARIA Logs with DB sync, restore original DNA, and stabilize chat integration)
             </div>
           ))}
         </div>

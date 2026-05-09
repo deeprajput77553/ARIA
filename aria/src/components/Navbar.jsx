@@ -79,6 +79,12 @@ const Navbar = ({ currentPage, onNavigate }) => {
         </button>
         <button className={`nav-btn ${currentPage === 'chat' ? 'active' : ''}`} onClick={() => nav('chat')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="17" height="17">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span>Chats</span>
+        </button>
+        <button className={`nav-btn ${currentPage === 'logs' ? 'active' : ''}`} onClick={() => nav('logs')}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="17" height="17">
             <path d="M12 20h9M3 20h2M3 12h18M3 4h18" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           <span>Logs</span>
