@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import WelcomeScreen from './components/WelcomeScreen';
-import Navbar from './components/Navbar';
-import Orb from './components/Orb';
-import Logs from './components/Logs';
-import AuthPage from './components/AuthPage';
-import SettingsPage from './components/SettingsPage';
+import WelcomeScreen    from './components/WelcomeScreen';
+import Navbar           from './components/Navbar';
+import Orb              from './components/Orb';
+import Logs             from './components/Logs';
+import AuthPage         from './components/AuthPage';
+import SettingsPage     from './components/SettingsPage';
+import KnowledgeGraph   from './components/KnowledgeGraph';
+import AuditLog         from './components/AuditLog';
 import './App.css';
 
 function App() {
@@ -25,6 +27,8 @@ function App() {
       <main className="app-main">
         {screen === 'orb'      && <Orb onNavigate={navigate}/>}
         {screen === 'chat'     && <Logs/>}
+        {screen === 'graph'    && <KnowledgeGraph/>}
+        {screen === 'audit'    && <AuditLog/>}
         {screen === 'settings' && <SettingsPage/>}
       </main>
     </div>

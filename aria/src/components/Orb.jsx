@@ -146,6 +146,8 @@ const layerFragmentShader = `
 import { loadSettings } from './SettingsPage';
 import { speakFemale, loadLog, saveLog } from './Logs';
 import { loadProfile, buildProactiveGreeting } from '../storage/UserProfile';
+import { startProactiveMonitor, stopProactiveMonitor, buildContextualGreeting } from '../storage/ProactiveEngine';
+import { scheduleDecayRunner } from '../storage/DecayRunner';
 import Chat from './Chat';
 
 // ─── OLLAMA API HOOK ──────────────────────────────────────────────────────────
@@ -229,25 +231,7 @@ const Orb = ({ onStateChange, onNavigate }) => {
   const { isAvailable, model, chat } = useOllama();
 
   const recognitionRef = useRef(null);
-  const greetedRef = useRef(false);
-
-  // Proactive greeting on mount
-  useEffect(() => {
-    if (greetedRef.current) return;
-    (async () => {
-      const p = await loadProfile();
-      const existing = loadLog();
-      // Only greet if log is empty or if it's been a while (optional)
-      // For now, let's greet if it's the start of the session
-      const text = buildProactiveGreeting(p);
-      setResponse(text);
-      setShowResponse(true);
-      setOrbState(2);
-      speakFemale(text, loadSettings());
-      setTimeout(() => setOrbState(0), 1000);
-      greetedRef.current = true;
-    })();
-  }, [setOrbState]);
+  const greetedRef    = useRef(false);
 
   const setOrbState = useCallback((s) => {
     orbState.current = s;
@@ -258,6 +242,40 @@ const Orb = ({ onStateChange, onNavigate }) => {
     if (shellRef.current) shellRef.current.material.opacity = s === 0 ? 0.1 : 0.05;
     onStateChange?.(s);
   }, [onStateChange]);
+
+  // ── Proactive greeting on mount (AFTER setOrbState is defined) ─────────────
+  useEffect(() => {
+    if (greetedRef.current) return;
+    greetedRef.current = true;
+    // Delay 1.5s so the orb finishes rendering first
+    const timer = setTimeout(async () => {
+      const p    = await loadProfile();
+      const text = buildProactiveGreeting(p);
+      setResponse(text);
+      setShowResponse(true);
+      setOrbState(2);
+      speakFemale(text, loadSettings());
+      setTimeout(() => setOrbState(0), 1200);
+    }, 1500);
+
+    // Start proactive background monitor
+    startProactiveMonitor((trigger) => {
+      setResponse(trigger.message);
+      setShowResponse(true);
+      setOrbState(2);
+      speakFemale(trigger.message, loadSettings());
+      setTimeout(() => setOrbState(0), 1000);
+    });
+
+    // Start decay runner
+    scheduleDecayRunner();
+
+    return () => {
+      clearTimeout(timer);
+      stopProactiveMonitor();
+    };
+  }, [setOrbState]);
+
 
   // ── Speech recognition ──────────────────────────────────────────────────
   const startListening = useCallback(() => {

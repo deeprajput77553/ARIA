@@ -83,6 +83,23 @@ const Navbar = ({ currentPage, onNavigate }) => {
           </svg>
           <span>Logs</span>
         </button>
+        <button className={`nav-btn ${currentPage === 'graph' ? 'active' : ''}`} onClick={() => nav('graph')}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="17" height="17">
+            <circle cx="5"  cy="12" r="2"/><circle cx="19" cy="5"  r="2"/><circle cx="19" cy="19" r="2"/>
+            <circle cx="12" cy="12" r="2.5" fill="currentColor" opacity="0.4"/>
+            <line x1="7" y1="11.2" x2="10.2" y2="12" strokeLinecap="round"/>
+            <line x1="13.8" y1="11" x2="17.2" y2="6.2" strokeLinecap="round"/>
+            <line x1="13.8" y1="13" x2="17.2" y2="17.8" strokeLinecap="round"/>
+          </svg>
+          <span>Graph</span>
+        </button>
+        <button className={`nav-btn ${currentPage === 'audit' ? 'active' : ''}`} onClick={() => nav('audit')}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="17" height="17">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span>Audit</span>
+        </button>
         <button className={`nav-btn ${currentPage === 'settings' ? 'active' : ''}`} onClick={() => nav('settings')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="17" height="17">
             <circle cx="12" cy="12" r="3"/>
