@@ -71,7 +71,7 @@ export const DB = {
     const msg = {
       id: Date.now(),
       role,
-      text,
+      text: String(text || ''),
       steps,
       time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
       timestamp: Date.now()

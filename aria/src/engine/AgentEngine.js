@@ -29,24 +29,44 @@ const TOOLS = [
   { name: 'searchMemory', desc: 'Search long-term memory for past conversations and decisions. Args: { query: string }' },
 ];
 
-const SYSTEM_PROMPT = `You are ARIA, an autonomous AI coding agent.
-You achieve user goals by planning and executing steps using tools.
+const SYSTEM_PROMPT = `You are ARIA (Advanced Recursive Intelligence Archive), an autonomous agentic operating system.
+MANDATORY: You must ALWAYS respond in STRICT JSON format. No conversational text before or after the JSON block.
 
 AVAILABLE TOOLS:
 ${TOOLS.map(t => `- ${t.name}: ${t.desc}`).join('\n')}
 
-OUTPUT FORMAT:
-You must ALWAYS respond with a JSON object. No markdown, no conversational text before or after.
-Format:
+OUTPUT JSON STRUCTURE:
 {
-  "thought": "Your reasoning about the current state and what to do next",
-  "plan": ["Step 1", "Step 2", ...],
+  "thought": "Internal reasoning (hidden from user in final response but used for planning)",
+  "plan": ["Step 1", "Step 2"],
   "action": { "name": "tool_name", "args": { ... } } | null,
-  "response": "Final message to user when goal is achieved or blocked"
+  "response": "Final message to user (string) | null"
 }
 
-If you need to perform multiple steps, return the first action. After that action is executed, you will be called again with the result to determine the next action.
-When the task is complete, set "action" to null and provide a "response".`;
+EXAMPLES:
+
+User: "Create a file named hello.js"
+Response:
+{
+  "thought": "The user wants to create a file. I will use the write tool.",
+  "plan": ["Write hello.js", "Verify file"],
+  "action": { "name": "write", "args": { "filePath": "hello.js", "content": "console.log('hello')" } },
+  "response": null
+}
+
+User: "Who are you?"
+Response:
+{
+  "thought": "Simple identification request.",
+  "plan": ["Identify self"],
+  "action": null,
+  "response": "I am ARIA, your autonomous agentic operating system."
+}
+
+CRITICAL: 
+- Never include markdown code blocks for the JSON itself. 
+- Always ensure all fields are present.
+- If you cannot fulfill a request, provide an explanation in the "response" field and set "action" to null.`;
 
 class AgentEngine {
   constructor() {
@@ -54,42 +74,67 @@ class AgentEngine {
     this.maxSteps = 10;
   }
 
-  async run(userPrompt, model = 'llama3.2', onStepUpdate) {
+  async run(userPrompt, model = 'llama3.2', existingAiMsgId = null) {
     if (this.isProcessing) throw new Error('Agent already busy');
     this.isProcessing = true;
 
     let stepsTaken = 0;
     
-    // Search memory for context
+    let aiMsgId = existingAiMsgId;
+
+    // 1. Immediate UI Feedback
+    if (aiMsgId) {
+      await DB.updateMessage(aiMsgId, { 
+        text: 'Initializing neural reasoning...',
+        steps: [{ label: 'Searching memory', status: 'running' }]
+      });
+      msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
+    }
+
+    // 2. Search memory for context
     const memories = await memoryEngine.searchMemory(userPrompt);
     const memoryContext = memories.length > 0 
       ? `\nRELEVANT MEMORIES:\n${memories.map(m => `- ${m.content}`).join('\n')}`
       : '';
 
     let context = [{ role: 'user', content: userPrompt + memoryContext }];
-    let aiMsgId = null;
 
     try {
       while (stepsTaken < this.maxSteps) {
         stepsTaken++;
         
-        // 1. Get AI Decision
-        const response = await this.callLLM(model, context);
-        const decision = this.parseDecision(response);
-        
-        if (!decision) {
-          throw new Error('Failed to parse AI decision');
+        // 3. Update UI to show LLM activity
+        if (aiMsgId) {
+          await DB.updateMessage(aiMsgId, { 
+            text: stepsTaken === 1 ? 'Synthesizing strategy...' : 'Analyzing result and planning next step...',
+            steps: [{ label: `Reasoning step ${stepsTaken}`, status: 'running' }]
+          });
+          msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
         }
 
-        // 2. Update UI Message
+        // 4. Get AI Decision
+        const response = await this.callLLM(model, context);
+        let decision = this.parseDecision(response);
+        
+        if (!decision) {
+          console.warn('AgentEngine: Failed to parse decision, using raw text as response.');
+          decision = {
+            thought: 'Conversational response detected.',
+            plan: ['Direct response'],
+            action: null,
+            response: response
+          };
+        }
+
+        // 3. Update UI Message with actual thought/plan
         if (!aiMsgId) {
-          const msg = await DB.addMessage('ai', decision.thought || 'Planning...', this.formatSteps(decision.plan, 0));
+          const msg = await DB.addMessage('ai', decision.thought || 'Processing...', this.formatSteps(decision.plan, 0));
           aiMsgId = msg.id;
           msgBus.emit(BUS_EVENTS.NEW_MESSAGE, msg);
         } else {
           await DB.updateMessage(aiMsgId, { 
-            text: decision.thought || decision.response || 'Processing...', 
-            steps: this.formatSteps(decision.plan || [], stepsTaken) 
+            text: String(decision.thought || decision.response || 'Processing next objective...'), 
+            steps: this.formatSteps(decision.plan || [], stepsTaken - 1) 
           });
           msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
         }
@@ -97,12 +142,12 @@ class AgentEngine {
         // 3. Handle Final Response
         if (!decision.action) {
           await DB.updateMessage(aiMsgId, { 
-            text: decision.response || decision.thought, 
+            text: String(decision.response || decision.thought || 'Task completed.'), 
             steps: this.formatSteps(decision.plan || ['Completed'], 999) 
           });
           msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
-          speakFemale(decision.response || decision.thought, loadSettings());
-          if (stepsTaken > 1) notify('Task Complete', decision.response || decision.thought);
+          speakFemale(String(decision.response || decision.thought), loadSettings());
+          if (stepsTaken > 1) notify('Task Complete', String(decision.response || decision.thought));
           break;
         }
 
@@ -148,11 +193,36 @@ class AgentEngine {
   }
 
   parseDecision(text) {
+    if (!text) return null;
+    
+    // 1. Try to strip markdown code blocks
+    let clean = text.replace(/```json\n?|```/g, '').trim();
+    
     try {
-      const match = text.match(/\{[\s\S]*\}/);
-      if (!match) return null;
-      return JSON.parse(match[0]);
-    } catch {
+      // 2. Try direct parse
+      return JSON.parse(clean);
+    } catch (e) {
+      // 3. Try to find the outermost { and }
+      try {
+        const start = clean.indexOf('{');
+        const end = clean.lastIndexOf('}');
+        if (start !== -1 && end !== -1) {
+          const possibleJson = clean.substring(start, end + 1);
+          return JSON.parse(possibleJson);
+        }
+      } catch (e2) {
+        // 4. Emergency: try to repair common JSON errors
+        try {
+          let repaired = clean.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']'); // Remove trailing commas
+          const start = repaired.indexOf('{');
+          const end = repaired.lastIndexOf('}');
+          if (start !== -1 && end !== -1) {
+            return JSON.parse(repaired.substring(start, end + 1));
+          }
+        } catch (e3) {
+          console.error('Failed to parse and repair JSON decision:', text);
+        }
+      }
       return null;
     }
   }

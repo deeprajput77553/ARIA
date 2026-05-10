@@ -336,7 +336,7 @@ const Orb = ({ onStateChange }) => {
         msgBus.emit(BUS_EVENTS.NEW_MESSAGE, aiMsg);
 
         try {
-          await agentEngine.run(text, model);
+          await agentEngine.run(text, model, aiMsg.id);
           setStatusText('Done — tap to speak again');
           setTimeout(() => setOrbState(0), 800);
           setTimeout(() => setStatusText('Tap to speak'), 3500);

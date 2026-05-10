@@ -843,7 +843,15 @@
 }
 .typing-cursor-inline {
   display: inline-block;
-  animation: blink 1s step-end infinite;
+  color: #38bdf8;
+  font-weight: bold;
+  margin-left: 2px;
+  animation: cf-blink 1s step-end infinite;
+}
+
+@keyframes cf-blink {
+  from, to { opacity: 1; }
+  50% { opacity: 0; }
 }
 
 /* Input bar */

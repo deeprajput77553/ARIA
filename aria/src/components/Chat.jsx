@@ -51,7 +51,7 @@ const Chat = ({ onNavigate }) => {
     msgBus.emit(BUS_EVENTS.NEW_MESSAGE, aiMsg);
 
     try {
-      await agentEngine.run(text, model);
+      await agentEngine.run(text, model, aiMsg.id);
       setLoading(false);
     } catch (err) {
       console.error(err);
@@ -159,7 +159,7 @@ const Chat = ({ onNavigate }) => {
                 </span>
                 <span className="cf-time">{m.time}</span>
               </div>
-              {m.text && <p className="cf-text">{m.text}</p>}
+              {m.text && <p className="cf-text">{typeof m.text === 'string' ? m.text : JSON.stringify(m.text)}</p>}
               {!m.text && m.role === 'ai' && <div className="cf-text typing-cursor-inline">▌</div>}
               {m.steps && m.steps.length > 0 && (
                 <div className="cf-steps">
