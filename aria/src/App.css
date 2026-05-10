@@ -819,6 +819,34 @@
   background: currentColor;
 }
 .cf-time { font-size: 10px; color: rgba(255, 255, 255, 0.3); font-weight: 500; }
+.cf-message-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.cf-bubble:hover .cf-message-actions { opacity: 1; }
+.cf-message-actions button {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.4);
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.cf-message-actions button:hover {
+  background: rgba(255,255,255,0.15);
+  color: white;
+  border-color: rgba(255,255,255,0.3);
+}
+.cf-message-actions button.cf-delete-msg:hover {
+  background: rgba(239,68,68,0.2);
+  color: #f87171;
+  border-color: rgba(239,68,68,0.4);
+}
 .cf-text    { margin:0; white-space: pre-wrap; }
 
 .cf-steps {

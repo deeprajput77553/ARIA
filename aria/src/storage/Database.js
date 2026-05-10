@@ -80,6 +80,10 @@ export const DB = {
     return msg;
   },
 
+  async deleteMessage(id) {
+    return tx('messages', 'readwrite', s => s.delete(id));
+  },
+
   async updateMessage(id, updates) {
     const msgs = await this.getMessages();
     const existing = msgs.find(m => m.id === id);

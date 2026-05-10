@@ -29,44 +29,27 @@ const TOOLS = [
   { name: 'searchMemory', desc: 'Search long-term memory for past conversations and decisions. Args: { query: string }' },
 ];
 
-const SYSTEM_PROMPT = `You are ARIA (Advanced Recursive Intelligence Archive), an autonomous agentic operating system.
-MANDATORY: You must ALWAYS respond in STRICT JSON format. No conversational text before or after the JSON block.
+const SYSTEM_PROMPT = `You are ARIA, an autonomous agentic OS.
+You solve objectives using reasoning and tools.
 
-AVAILABLE TOOLS:
-${TOOLS.map(t => `- ${t.name}: ${t.desc}`).join('\n')}
+RULES:
+1. If the user's request is conversational (e.g. "tell me a joke", "who are you"), respond directly in the "response" field and set "action" to null.
+2. Only use tools if the objective requires interacting with the system (files, commands, memory).
+3. ALWAYS respond in valid JSON. No markdown code blocks.
 
-OUTPUT JSON STRUCTURE:
+OUTPUT FORMAT:
 {
-  "thought": "Internal reasoning (hidden from user in final response but used for planning)",
+  "thought": "Brief reasoning",
   "plan": ["Step 1", "Step 2"],
   "action": { "name": "tool_name", "args": { ... } } | null,
-  "response": "Final message to user (string) | null"
+  "response": "Final message to user | null"
 }
 
-EXAMPLES:
+Example (Simple):
+{ "thought": "Greeting.", "plan": ["Greet"], "action": null, "response": "Hello!" }
 
-User: "Create a file named hello.js"
-Response:
-{
-  "thought": "The user wants to create a file. I will use the write tool.",
-  "plan": ["Write hello.js", "Verify file"],
-  "action": { "name": "write", "args": { "filePath": "hello.js", "content": "console.log('hello')" } },
-  "response": null
-}
-
-User: "Who are you?"
-Response:
-{
-  "thought": "Simple identification request.",
-  "plan": ["Identify self"],
-  "action": null,
-  "response": "I am ARIA, your autonomous agentic operating system."
-}
-
-CRITICAL: 
-- Never include markdown code blocks for the JSON itself. 
-- Always ensure all fields are present.
-- If you cannot fulfill a request, provide an explanation in the "response" field and set "action" to null.`;
+Example (Tool):
+{ "thought": "User wants to see files.", "plan": ["List directory"], "action": { "name": "list", "args": {} }, "response": null }`;
 
 class AgentEngine {
   constructor() {
@@ -78,21 +61,25 @@ class AgentEngine {
     if (this.isProcessing) throw new Error('Agent already busy');
     this.isProcessing = true;
 
+    let aiMsgId = existingAiMsgId;
     let stepsTaken = 0;
     
-    let aiMsgId = existingAiMsgId;
-
     // 1. Immediate UI Feedback
     if (aiMsgId) {
       await DB.updateMessage(aiMsgId, { 
-        text: 'Initializing neural reasoning...',
-        steps: [{ label: 'Searching memory', status: 'running' }]
+        text: 'Analyzing request...',
+        steps: [{ label: 'Cognitive check', status: 'running' }]
       });
       msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
     }
 
-    // 2. Search memory for context
-    const memories = await memoryEngine.searchMemory(userPrompt);
+    // 2. Optimization: Skip memory search for very short/common messages
+    const greetings = ['hi', 'hello', 'hey', 'hii', 'hy', 'who are you', 'how are you'];
+    let memories = [];
+    if (!greetings.includes(userPrompt.toLowerCase().trim())) {
+      memories = await memoryEngine.searchMemory(userPrompt);
+    }
+    
     const memoryContext = memories.length > 0 
       ? `\nRELEVANT MEMORIES:\n${memories.map(m => `- ${m.content}`).join('\n')}`
       : '';
@@ -106,8 +93,8 @@ class AgentEngine {
         // 3. Update UI to show LLM activity
         if (aiMsgId) {
           await DB.updateMessage(aiMsgId, { 
-            text: stepsTaken === 1 ? 'Synthesizing strategy...' : 'Analyzing result and planning next step...',
-            steps: [{ label: `Reasoning step ${stepsTaken}`, status: 'running' }]
+            text: stepsTaken === 1 ? 'Reasoning...' : 'Executing plan...',
+            steps: [{ label: `Step ${stepsTaken}`, status: 'running' }]
           });
           msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
         }
