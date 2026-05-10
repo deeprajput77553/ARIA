@@ -4,6 +4,7 @@ import { DB } from '../storage/Database.js';
 import { msgBus, BUS_EVENTS } from '../storage/MessageBus.js';
 import { speakFemale } from './Logs';
 import { useOllama } from './Orb';
+import { agentEngine } from '../engine/AgentEngine';
 
 const Chat = ({ onNavigate }) => {
   const settings = loadSettings();
@@ -50,37 +51,12 @@ const Chat = ({ onNavigate }) => {
     msgBus.emit(BUS_EVENTS.NEW_MESSAGE, aiMsg);
 
     try {
-      let fullText = '';
-      await chat(
-        text,
-        async (chunk) => {
-          fullText += chunk;
-          await DB.updateMessage(aiMsg.id, { text: fullText });
-          msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
-        },
-        async (full) => {
-          if (full.startsWith('[Ollama unavailable')) {
-            await DB.updateMessage(aiMsg.id, { 
-              text: '⚠ Connection to core intelligence failed. Ensure Ollama is running.',
-              steps: [{ label: 'Error', status: 'error' }]
-            });
-          } else {
-            await DB.updateMessage(aiMsg.id, {
-              text: full,
-              steps: [
-                { label: 'Parsing intent', status: 'done' },
-                { label: 'Synthesizing response', status: 'done' }
-              ]
-            });
-            speakFemale(full, settings);
-          }
-          msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
-          setLoading(false);
-        }
-      );
+      await agentEngine.run(text, model);
+      setLoading(false);
     } catch (err) {
+      console.error(err);
       await DB.updateMessage(aiMsg.id, { 
-        text: '⚠ Critical system error.',
+        text: `⚠ Agent error: ${err.message}`,
         steps: [{ label: 'Error', status: 'error' }]
       });
       msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
@@ -137,6 +113,24 @@ const Chat = ({ onNavigate }) => {
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M19 6L18 19a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
               <path d="M10 11v6M14 11v6M4 6h16M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+            </svg>
+          </button>
+          <button 
+            className="cf-icon-btn cf-snapshot" 
+            onClick={async () => {
+              const res = await fetch('http://localhost:3001/git/snapshot', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: 'Manual snapshot from Chat' })
+              });
+              const data = await res.json();
+              if (data.ok) alert('Git Snapshot created: ' + data.message);
+              else alert('Snapshot failed: ' + data.error);
+            }} 
+            title="Create Git Snapshot"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>
             </svg>
           </button>
           <button className="cf-icon-btn cf-close" onClick={() => onNavigate('orb')}>

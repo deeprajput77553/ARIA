@@ -147,6 +147,7 @@ import { loadSettings } from './SettingsPage';
 import { speakFemale } from './Logs';
 import { DB } from '../storage/Database.js';
 import { msgBus, BUS_EVENTS } from '../storage/MessageBus.js';
+import { agentEngine } from '../engine/AgentEngine';
 
 // ─── OLLAMA API HOOK ──────────────────────────────────────────────────────────
 export const useOllama = () => {
@@ -179,10 +180,14 @@ export const useOllama = () => {
 
   const chat = useCallback(async (prompt, onChunk, onDone) => {
     try {
-      const res = await fetch('http://localhost:11434/api/generate', {
+      const res = await fetch('http://localhost:11434/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, prompt, stream: true })
+        body: JSON.stringify({ 
+          model, 
+          messages: [{ role: 'user', content: prompt }], 
+          stream: true 
+        })
       });
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -195,7 +200,10 @@ export const useOllama = () => {
         for (const line of lines) {
           try {
             const j = JSON.parse(line);
-            if (j.response) { full += j.response; onChunk(j.response); }
+            if (j.message?.content) { 
+              full += j.message.content; 
+              onChunk(j.message.content); 
+            }
           } catch { }
         }
       }
@@ -327,30 +335,16 @@ const Orb = ({ onStateChange }) => {
         ]);
         msgBus.emit(BUS_EVENTS.NEW_MESSAGE, aiMsg);
 
-        let fullText = '';
-        await chat(
-          text,
-          async (chunk) => {
-            fullText += chunk;
-            setResponse(fullText);
-            await DB.updateMessage(aiMsg.id, { text: fullText });
-            msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
-          },
-          async (full) => {
-            await DB.updateMessage(aiMsg.id, {
-              text: full,
-              steps: [
-                { label: 'Voice intent parsed', status: 'done' },
-                { label: 'Synthesizing response', status: 'done' }
-              ]
-            });
-            msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
-            speakFemale(full, loadSettings());
-            setStatusText('Done — tap to speak again');
-            setTimeout(() => setOrbState(0), 800);
-            setTimeout(() => setStatusText('Tap to speak'), 3500);
-          }
-        );
+        try {
+          await agentEngine.run(text, model);
+          setStatusText('Done — tap to speak again');
+          setTimeout(() => setOrbState(0), 800);
+          setTimeout(() => setStatusText('Tap to speak'), 3500);
+        } catch (err) {
+          console.error(err);
+          setStatusText('Agent error');
+          setOrbState(0);
+        }
       } else {
         setOrbState(0);
         setStatusText('Tap to speak');

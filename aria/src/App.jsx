@@ -4,13 +4,23 @@ import Navbar from './components/Navbar';
 import Orb from './components/Orb';
 import Logs from './components/Logs';
 import Chat from './components/Chat';
+import Dashboard from './components/Dashboard';
 import AuthPage from './components/AuthPage';
 import SettingsPage from './components/SettingsPage';
+import { proactiveEngine } from './engine/ProactiveEngine';
 import './App.css';
 
 function App() {
   const [screen, setScreen] = useState('welcome');
   const [authMode, setAuthMode] = useState('signin');
+
+  React.useEffect(() => {
+    proactiveEngine.start();
+    if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
+    return () => proactiveEngine.stop();
+  }, []);
 
   const navigate = (page) => {
     if (page === 'signin' || page === 'signup') { 
@@ -31,6 +41,7 @@ function App() {
         {screen === 'orb'      && <Orb onNavigate={navigate}/>}
         {screen === 'chat'     && <Chat onNavigate={navigate}/>}
         {screen === 'logs'     && <Logs/>}
+        {screen === 'dashboard' && <Dashboard/>}
         {screen === 'settings' && <SettingsPage/>}
       </main>
     </div>

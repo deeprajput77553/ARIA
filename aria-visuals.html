@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARIA | Neural Visuals</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #050510;
+            --accent-cyan: #00f2ff;
+            --accent-purple: #7800ff;
+            --accent-magenta: #ff00ff;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: white;
+            font-family: 'Outfit', sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Gradient Background Glows */
+        .glow {
+            position: fixed;
+            width: 50vw;
+            height: 50vw;
+            border-radius: 50%;
+            filter: blur(120px);
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.15;
+        }
+
+        .glow-1 {
+            top: -10%;
+            left: -10%;
+            background: var(--accent-purple);
+        }
+
+        .glow-2 {
+            bottom: -10%;
+            right: -10%;
+            background: var(--accent-cyan);
+        }
+
+        header {
+            position: relative;
+            z-index: 10;
+            padding: 30px 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .main-container {
+            flex: 1;
+            display: flex;
+            position: relative;
+            z-index: 1;
+            padding: 0 50px 50px 50px;
+            gap: 30px;
+        }
+
+        .visual-card {
+            flex: 1;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .visual-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-5px);
+        }
+
+        .card-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .canvas-wrapper {
+            flex: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #orb-canvas-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        #dna-canvas {
+            max-height: 90%;
+            max-width: 100%;
+        }
+
+        .controls-overlay {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            gap: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px 20px;
+            border-radius: 40px;
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(15px);
+        }
+
+        button {
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
+        }
+
+        button.active {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+            border: none;
+            box-shadow: 0 0 20px rgba(120, 0, 255, 0.5);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            box-shadow: 0 0 10px var(--accent-cyan);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.4; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.2); }
+            100% { opacity: 0.4; transform: scale(0.8); }
+        }
+
+        @media (max-width: 900px) {
+            .main-container {
+                flex-direction: column;
+                overflow-y: auto;
+            }
+            .visual-card {
+                min-height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="glow glow-1"></div>
+    <div class="glow glow-2"></div>
+
+    <header>
+        <div class="logo">ARIA</div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <span style="font-size: 12px; opacity: 0.6; letter-spacing: 1px;">SYSTEM READY</span>
+            <div class="status-dot"></div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Orb Section -->
+        <div class="visual-card">
+            <div class="card-header">
+                <div class="card-title">Neural Orb</div>
+                <div style="font-size: 10px; opacity: 0.4;">THREE.JS / SHADERS</div>
+            </div>
+            <div class="canvas-wrapper">
+                <div id="orb-canvas-container"></div>
+            </div>
+        </div>
+
+        <!-- DNA Section -->
+        <div class="visual-card">
+            <div class="card-header">
+                <div class="card-title">Helix Signature</div>
+                <div style="font-size: 10px; opacity: 0.4;">CANVAS 2D / PROCEDURAL</div>
+            </div>
+            <div class="canvas-wrapper">
+                <canvas id="dna-canvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls-overlay">
+        <button id="btn-idle" class="active">Idle</button>
+        <button id="btn-listen">Listen</button>
+        <button id="btn-speak">Speak</button>
+    </div>
+
+    <!-- Three.js Library -->
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- ORB SHADERS ---
+        const vertexShader = `
+            varying vec2 vUv;
+            varying vec3 vPosition;
+            varying vec3 vNormal;
+            uniform float uTime;
+            uniform float uState; 
+            uniform float uAudioData;
+
+            vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
+            vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
+
+            float snoise(vec3 v){ 
+                const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;
+                const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
+                vec3 i  = floor(v + dot(v, C.yyy) );
+                vec3 x0 = v - i + dot(i, C.xxx) ;
+                vec3 g = step(x0.yzx, x0.xyz);
+                vec3 l = 1.0 - g;
+                vec3 i1 = min( g.xyz, l.zxy );
+                vec3 i2 = max( g.xyz, l.zxy );
+                vec3 x1 = x0 - i1 + 1.0 * C.xxx;
+                vec3 x2 = x0 - i2 + 2.0 * C.xxx;
+                vec3 x3 = x0 - 1.0 + 3.0 * C.xxx;
+                i = mod(i, 289.0 ); 
+                vec4 p = permute( permute( permute( i.z + vec4(0.0, i1.z, i2.z, 1.0 )) + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
+                float n_ = 1.0/7.0;
+                vec3  ns = n_ * D.wyz - D.xzx;
+                vec4 j = p - 49.0 * floor(p * ns.z *ns.z);
+                vec4 x_ = floor(j * ns.z);
+                vec4 y_ = floor(j - 7.0 * x_ );
+                vec4 x = x_ *ns.x + ns.yyyy;
+                vec4 y = y_ *ns.x + ns.yyyy;
+                vec4 h = 1.0 - abs(x) - abs(y);
+                vec4 b0 = vec4( x.xy, y.xy );
+                vec4 b1 = vec4( x.zw, y.zw );
+                vec4 s0 = floor(b0)*2.0 + 1.0;
+                vec4 s1 = floor(b1)*2.0 + 1.0;
+                vec4 sh = -step(h, vec4(0.0));
+                vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;
+                vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;
+                vec3 p0 = vec3(a0.xy,h.x);
+                vec3 p1 = vec3(a0.zw,h.y);
+                vec3 p2 = vec3(a1.xy,h.z);
+                vec3 p3 = vec3(a1.zw,h.w);
+                vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+                p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+                vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+                m = m * m;
+                return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3) ) );
+            }
+
+            void main() {
+                vUv = uv;
+                vNormal = normalize(normalMatrix * normal);
+                float noiseFreq = 1.5;
+                float noiseAmp = 0.2;
+                vec3 noisePos = vec3(position.x * noiseFreq + uTime * 0.5, position.y * noiseFreq + uTime * 0.5, position.z * noiseFreq);
+                float distortion = snoise(noisePos) * noiseAmp;
+                if (uState == 1.0) distortion += snoise(noisePos * 2.0) * 0.3 * uAudioData;
+                else if (uState == 2.0) distortion += sin(position.y * 10.0 + uTime * 5.0) * 0.1 * uAudioData;
+                vec3 newPosition = position + normal * distortion;
+                vPosition = newPosition;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
+            }
+        `;
+
+        const fragmentShader = `
+            varying vec2 vUv;
+            varying vec3 vPosition;
+            varying vec3 vNormal;
+            uniform float uTime;
+            uniform float uState;
+            void main() {
+                vec3 colorDark = vec3(0.05, 0.0, 0.3);
+                vec3 colorLight = vec3(0.0, 0.8, 1.0);
+                vec3 colorAccent = vec3(0.5, 0.0, 1.0);
+                vec3 viewDirection = normalize(cameraPosition - vPosition);
+                float fresnel = pow(1.0 - dot(viewDirection, vNormal), 2.0);
+                float mixValue = sin(vPosition.y * 2.0 + uTime) * 0.5 + 0.5;
+                vec3 color = mix(colorDark, colorLight, mixValue);
+                if (uState == 1.0) color = mix(color, vec3(1.0, 0.0, 1.0), fresnel * 1.5);
+                else if (uState == 2.0) {
+                    vec3 speakColor = mix(vec3(1.0, 0.0, 0.5), vec3(0.0, 1.0, 0.5), sin(vPosition.x * 2.0 + uTime * 5.0) * 0.5 + 0.5);
+                    color = mix(color, speakColor, fresnel * 1.8);
+                } else color = mix(color, colorAccent, fresnel);
+                gl_FragColor = vec4(color + fresnel * 1.2, 0.95);
+            }
+        `;
+
+        const layerFragmentShader = `
+            varying vec3 vPosition;
+            varying vec3 vNormal;
+            uniform float uTime;
+            uniform float uColor;
+            void main() {
+                vec3 c1 = vec3(0.5, 0.0, 1.0);
+                vec3 c2 = vec3(0.0, 1.0, 0.8);
+                vec3 c3 = vec3(1.0, 0.3, 0.0);
+                vec3 base = uColor < 1.0 ? c1 : (uColor < 2.0 ? c2 : c3);
+                float fresnel = pow(1.0 - dot(vec3(0,0,1), vNormal), 3.0);
+                float pulse = sin(uTime * 2.0 + vPosition.x) * 0.5 + 0.5;
+                gl_FragColor = vec4(base, fresnel * pulse * 0.6);
+            }
+        `;
+
+        // --- ORB SETUP ---
+        const orbContainer = document.getElementById('orb-canvas-container');
+        const orbScene = new THREE.Scene();
+        const orbCamera = new THREE.PerspectiveCamera(75, orbContainer.clientWidth / orbContainer.clientHeight, 0.1, 1000);
+        orbCamera.position.z = 4.5;
+
+        const orbRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        orbRenderer.setSize(orbContainer.clientWidth, orbContainer.clientHeight);
+        orbRenderer.setPixelRatio(window.devicePixelRatio);
+        orbContainer.appendChild(orbRenderer.domElement);
+
+        const orbUniforms = { uTime: { value: 0 }, uState: { value: 0 }, uAudioData: { value: 0.2 } };
+        
+        const orbGeo = new THREE.IcosahedronGeometry(2, 64);
+        const orbMat = new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms: orbUniforms, transparent: true });
+        const orbMesh = new THREE.Mesh(orbGeo, orbMat);
+        orbScene.add(orbMesh);
+
+        const innerMat = new THREE.ShaderMaterial({ 
+            vertexShader, 
+            fragmentShader: layerFragmentShader, 
+            uniforms: { uTime: orbUniforms.uTime, uColor: { value: 2.0 } }, 
+            transparent: true, blending: THREE.AdditiveBlending, side: THREE.DoubleSide 
+        });
+        const innerMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(1.2, 64), innerMat);
+        orbScene.add(innerMesh);
+
+        const midMat = new THREE.ShaderMaterial({ 
+            vertexShader, 
+            fragmentShader: layerFragmentShader, 
+            uniforms: { uTime: orbUniforms.uTime, uColor: { value: 1.0 } }, 
+            transparent: true, blending: THREE.AdditiveBlending 
+        });
+        const midMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(1.7, 64), midMat);
+        orbScene.add(midMesh);
+
+        // --- DNA SETUP ---
+        const dnaCanvas = document.getElementById('dna-canvas');
+        const dnaCtx = dnaCanvas.getContext('2d');
+        const dnaDPR = Math.min(window.devicePixelRatio || 1, 2);
+        
+        function resizeDNA() {
+            const parent = dnaCanvas.parentElement;
+            dnaCanvas.width = parent.clientWidth * dnaDPR;
+            dnaCanvas.height = parent.clientHeight * dnaDPR;
+            dnaCanvas.style.width = parent.clientWidth + 'px';
+            dnaCanvas.style.height = parent.clientHeight + 'px';
+            dnaCtx.scale(dnaDPR, dnaDPR);
+        }
+        window.addEventListener('resize', () => {
+            orbCamera.aspect = orbContainer.clientWidth / orbContainer.clientHeight;
+            orbCamera.updateProjectionMatrix();
+            orbRenderer.setSize(orbContainer.clientWidth, orbContainer.clientHeight);
+            resizeDNA();
+        });
+        resizeDNA();
+
+        const DNA_CONFIG = {
+            N: 28, RAD: 70, RPM: 6,
+            COL_A: [120, 0, 255], // Purple
+            COL_B: [0, 242, 255], // Cyan
+        };
+        let dnaPhi = 0;
+
+        function drawDNA(dt, state, audioData) {
+            const w = dnaCanvas.width / dnaDPR;
+            const h = dnaCanvas.height / dnaDPR;
+            const cx = w / 2;
+            const gap = h / (DNA_CONFIG.N - 1);
+            
+            dnaPhi += (DNA_CONFIG.RPM / 60) * Math.PI * 2 * dt;
+            if (state === 1) dnaPhi += dt * 5 * audioData;
+            if (state === 2) dnaPhi += dt * 8 * audioData;
+
+            dnaCtx.clearRect(0, 0, w, h);
+
+            const nodes = [];
+            for (let i = 0; i < DNA_CONFIG.N; i++) {
+                const y = i * gap;
+                const t = dnaPhi + (i / (DNA_CONFIG.N - 1)) * Math.PI * 4;
+                const xA = cx + Math.cos(t) * DNA_CONFIG.RAD;
+                const xB = cx + Math.cos(t + Math.PI) * DNA_CONFIG.RAD;
+                const dA = (Math.sin(t) + 1) / 2;
+                const dB = (Math.sin(t + Math.PI) + 1) / 2;
+                nodes.push({ y, xA, xB, dA, dB });
+            }
+
+            // Draw bridges
+            for (let i = 0; i < DNA_CONFIG.N; i++) {
+                const n = nodes[i];
+                const avgD = (n.dA + n.dB) / 2;
+                dnaCtx.beginPath();
+                dnaCtx.moveTo(n.xA, n.y);
+                dnaCtx.lineTo(n.xB, n.y);
+                dnaCtx.strokeStyle = `rgba(255, 255, 255, ${0.1 + avgD * 0.2})`;
+                dnaCtx.lineWidth = 1 + avgD * 2;
+                dnaCtx.stroke();
+            }
+
+            // Draw spheres
+            nodes.sort((a, b) => a.dA - b.dA); // Simplified depth sort
+            nodes.forEach(n => {
+                const drawNode = (x, y, d, rgb) => {
+                    const r = 4 + d * 6;
+                    const grad = dnaCtx.createRadialGradient(x - r/3, y - r/3, r/10, x, y, r);
+                    grad.addColorStop(0, 'white');
+                    grad.addColorStop(0.4, `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`);
+                    grad.addColorStop(1, 'black');
+                    dnaCtx.beginPath();
+                    dnaCtx.arc(x, y, r, 0, Math.PI * 2);
+                    dnaCtx.fillStyle = grad;
+                    dnaCtx.fill();
+                    dnaCtx.shadowBlur = 15 * d;
+                    dnaCtx.shadowColor = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.5)`;
+                };
+                drawNode(n.xA, n.y, n.dA, DNA_CONFIG.COL_A);
+                drawNode(n.xB, n.y, n.dB, DNA_CONFIG.COL_B);
+            });
+        }
+
+        // --- ANIMATION LOOP ---
+        const clock = new THREE.Clock();
+        let currentStatus = 0; // 0: idle, 1: listen, 2: speak
+        let targetAudio = 0.2;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = clock.getDelta();
+            const time = clock.getElapsedTime();
+
+            // Update Orb
+            orbUniforms.uTime.value = time;
+            if (currentStatus === 1) targetAudio = 0.4 + Math.random() * 0.4;
+            else if (currentStatus === 2) targetAudio = 0.6 + Math.sin(time * 10) * 0.4;
+            else targetAudio = 0.1 + Math.sin(time * 2) * 0.05;
+
+            orbUniforms.uAudioData.value += (targetAudio - orbUniforms.uAudioData.value) * 0.1;
+            
+            orbMesh.rotation.y += 0.005;
+            midMesh.rotation.z -= 0.007;
+            innerMesh.rotation.x += 0.01;
+
+            orbRenderer.render(orbScene, orbCamera);
+
+            // Update DNA
+            drawDNA(dt, currentStatus, orbUniforms.uAudioData.value);
+        }
+        animate();
+
+        // --- CONTROLS ---
+        const buttons = {
+            idle: document.getElementById('btn-idle'),
+            listen: document.getElementById('btn-listen'),
+            speak: document.getElementById('btn-speak')
+        };
+
+        function setStatus(status) {
+            currentStatus = status;
+            orbUniforms.uState.value = status;
+            Object.values(buttons).forEach(b => b.classList.remove('active'));
+            if (status === 0) buttons.idle.classList.add('active');
+            if (status === 1) buttons.listen.classList.add('active');
+            if (status === 2) buttons.speak.classList.add('active');
+            
+            // Visual feedback for DNA
+            if (status === 1) {
+                DNA_CONFIG.COL_A = [255, 0, 255];
+                DNA_CONFIG.COL_B = [0, 242, 255];
+            } else if (status === 2) {
+                DNA_CONFIG.COL_A = [255, 255, 0];
+                DNA_CONFIG.COL_B = [255, 0, 255];
+            } else {
+                DNA_CONFIG.COL_A = [120, 0, 255];
+                DNA_CONFIG.COL_B = [0, 242, 255];
+            }
+        }
+
+        buttons.idle.onclick = () => setStatus(0);
+        buttons.listen.onclick = () => setStatus(1);
+        buttons.speak.onclick = () => setStatus(2);
+
+    </script>
+</body>
+</html>

@@ -19,9 +19,21 @@ const { exec } = require('child_process');
 const fs       = require('fs');
 const path     = require('path');
 const os       = require('os');
+const Validator = require('./validator');
 
 const app  = express();
 const PORT = 3001;
+const validator = new Validator();
+
+// ── Workspace Observer (F-18) ────────────────────────────────────────────────
+fs.watch(__dirname, { recursive: true }, (eventType, filename) => {
+  if (filename && !filename.includes('node_modules') && !filename.includes('.git') && !filename.includes('aria_workspace')) {
+    // We don't have direct access to the DB here easily without more setup, 
+    // so we'll just log to console for now or we could emit to a socket if we had one.
+    // Actually, we can just print it and the agent can read the server logs if needed.
+    console.log(`[OBSERVER] ${eventType}: ${filename}`);
+  }
+});
 
 // ── Sandbox workspace ─────────────────────────────────────────────────────────
 const WORKSPACE = path.join(__dirname, 'aria_workspace');
@@ -132,11 +144,27 @@ app.post('/run', (req, res) => {
   });
 });
 
+// ── POST /validate ───────────────────────────────────────────────────────────
+app.post('/validate', (req, res) => {
+  const { code, filename } = req.body;
+  if (!code) return res.status(400).json({ error: 'code required' });
+  const result = validator.validate(code, filename);
+  res.json(result);
+});
+
 // ── POST /test ────────────────────────────────────────────────────────────────
 // Write + run in one step (the "sandbox test" step)
 app.post('/test', async (req, res) => {
-  const { testCode, language } = req.body;
+  const { testCode, language, skipValidation } = req.body;
   if (!testCode) return res.status(400).json({ error: 'testCode required' });
+
+  // Optional pre-validation
+  if (!skipValidation) {
+    const v = validator.validate(testCode);
+    if (!v.valid && v.recommendation === 'reject') {
+      return res.status(403).json({ error: 'Validation failed: Unsafe code patterns detected', details: v });
+    }
+  }
 
   const ext = language === 'python' ? '.py' : '.js';
   const testFile = `sandbox_test_${Date.now()}${ext}`;
@@ -169,6 +197,67 @@ app.post('/ollama-generate', async (req, res) => {
     });
     const data = await response.json();
     res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── POST /git/snapshot ───────────────────────────────────────────────────────
+app.post('/git/snapshot', (req, res) => {
+  const { message } = req.body;
+  const msg = message ? `AI_SNAPSHOT: ${message}` : `AI_SNAPSHOT: session_${Date.now()}`;
+  
+  exec('git add -A && git commit -m "' + msg + '"', { cwd: __dirname }, (err, stdout, stderr) => {
+    if (err && !stdout.includes('nothing to commit')) {
+      return res.status(500).json({ error: err.message, stderr });
+    }
+    res.json({ ok: true, message: msg, output: stdout });
+  });
+});
+
+// ── POST /git/rollback ───────────────────────────────────────────────────────
+app.post('/git/rollback', (req, res) => {
+  exec('git reset --hard HEAD~1', { cwd: __dirname }, (err, stdout, stderr) => {
+    if (err) return res.status(500).json({ error: err.message, stderr });
+    res.json({ ok: true, output: stdout });
+  });
+});
+
+// ── POST /search ─────────────────────────────────────────────────────────────
+app.post('/search', (req, res) => {
+  const { query, dir } = req.body;
+  if (!query) return res.status(400).json({ error: 'query required' });
+  
+  const searchDir = dir ? resolveSafe(dir) : __dirname;
+  const results = [];
+  const q = query.toLowerCase();
+
+  const walk = (d) => {
+    const files = fs.readdirSync(d);
+    for (const f of files) {
+      const p = path.join(d, f);
+      const stat = fs.statSync(p);
+      if (stat.isDirectory()) {
+        if (['node_modules', '.git', 'aria_workspace', 'dist'].includes(f)) continue;
+        walk(p);
+      } else {
+        const content = fs.readFileSync(p, 'utf8');
+        if (content.toLowerCase().includes(q)) {
+          const lines = content.split('\n');
+          lines.forEach((line, i) => {
+            if (line.toLowerCase().includes(q)) {
+              results.push(`${path.relative(__dirname, p)}:${i + 1}: ${line.trim()}`);
+            }
+          });
+        }
+      }
+      if (results.length > 100) break;
+    }
+  };
+
+  try {
+    walk(searchDir);
+    res.json({ results: results.slice(0, 50), count: results.length });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

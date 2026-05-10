@@ -88,6 +88,13 @@ const Navbar = ({ currentPage, onNavigate }) => {
           </svg>
           <span>Logs</span>
         </button>
+        <button className={`nav-btn ${currentPage === 'dashboard' ? 'active' : ''}`} onClick={() => nav('dashboard')}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="18" height="18">
+            <rect x="3" y="3" width="18" height="18" rx="2" strokeLinecap="round"/>
+            <path d="M7 12h10M7 8h6M7 16h4" strokeLinecap="round"/>
+          </svg>
+          <span>Dashboard</span>
+        </button>
         <button className={`nav-btn ${currentPage === 'settings' ? 'active' : ''}`} onClick={() => nav('settings')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="18" height="18">
             <circle cx="12" cy="12" r="3"/>
