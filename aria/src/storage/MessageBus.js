@@ -41,4 +41,5 @@ export const BUS_EVENTS = {
   MESSAGES_CLEARED: 'messages_cleared',
   STEP_UPDATE:      'step_update',       
   SANDBOX_EVENT:    'sandbox_event',     
+  PROFILE_UPDATED:  'profile_updated',
 };

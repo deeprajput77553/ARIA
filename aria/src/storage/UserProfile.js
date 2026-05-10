@@ -9,6 +9,7 @@
  */
 
 import { DB } from './Database.js';
+import { msgBus, BUS_EVENTS } from './MessageBus.js';
 
 // ── Default empty profile ─────────────────────────────────────────────────────
 export const EMPTY_PROFILE = {
@@ -29,6 +30,12 @@ export const EMPTY_PROFILE = {
   notes: [],
 };
 
+// ── Get current name ──────────────────────────────────────────────────────────
+export async function getCurrentName() {
+  const profile = await loadProfile();
+  return profile.name || profile.user_name || 'Ajinkya';
+}
+
 // ── Load profile ──────────────────────────────────────────────────────────────
 export async function loadProfile() {
   const stored = await DB.getProfile();
@@ -37,32 +44,63 @@ export async function loadProfile() {
 
 // ── Save profile ──────────────────────────────────────────────────────────────
 export async function saveProfile(profile) {
+  // Ensure 'name' is synced with 'user_name' for dashboard compatibility
+  if (profile.name && !profile.user_name) profile.user_name = profile.name;
+  if (profile.user_name && !profile.name) profile.name = profile.user_name;
   await DB.saveProfile(profile);
+  msgBus.emit(BUS_EVENTS.PROFILE_UPDATED, profile);
+}
+
+// ── Regex-based personal info extraction (fast, reliable) ─────────────────────
+const PERSONAL_PATTERNS = [
+  { regex: /my name is ([A-Za-z\s]+)/i, key: "name" },
+  { regex: /i(?:'m| am) ([A-Za-z]+(?:\s[A-Za-z]+)?)/i, key: "name" },
+  { regex: /call me ([A-Za-z\s]+)/i, key: "name" },
+  { regex: /i(?:'m| am) from ([A-Za-z\s,]+?)(?:\.|,|$)/i, key: "location" },
+  { regex: /i live in ([A-Za-z\s,]+?)(?:\.|,|\sand\s|$)/i, key: "location" },
+  { regex: /i work (?:as|at) ([A-Za-z\s]+)/i, key: "occupation" },
+  { regex: /my job is ([A-Za-z\s]+)/i, key: "occupation" },
+  { regex: /i am (male|female|other)/i, key: "gender" },
+  { regex: /my gender is (male|female|other)/i, key: "gender" },
+  { regex: /(?:born on|date of birth|dob is|my birthday is) ([A-Za-z0-9\s,/-]+)/i, key: "dob" },
+];
+
+export function extractByRegex(message) {
+  const results = {};
+  for (const { regex, key } of PERSONAL_PATTERNS) {
+    const match = message.match(regex);
+    if (match && match[1]) {
+      results[key] = match[1].trim();
+    }
+  }
+  return results;
 }
 
 // ── Build system prompt context from profile ──────────────────────────────────
 export function buildProfileContext(profile) {
   if (!profile) return '';
-  const lines = ['[ARIA USER PROFILE — loaded from memory]'];
-  const salutation = profile.gender === 'male' ? 'Sir' : profile.gender === 'female' ? 'Ma\'am' : 'Sir/Ma\'am';
+  const salutation = profile.gender === 'female' ? "Ma'am" : "Sir";
   
-  if (profile.name)       lines.push(`User name: ${profile.name}`);
-  if (profile.gender)     lines.push(`User gender: ${profile.gender}`);
-  lines.push(`Preferred Salutation: ${salutation}`);
-  if (profile.occupation) lines.push(`Occupation: ${profile.occupation}`);
-  if (profile.location)   lines.push(`Location: ${profile.location}`);
-  if (profile.interests?.length) lines.push(`Known interests: ${profile.interests.join(', ')}`);
-  if (profile.projects?.length)  lines.push(`Active projects: ${profile.projects.join(', ')}`);
-  if (profile.last_topics?.length) lines.push(`Recent topics: ${profile.last_topics.slice(-5).join(', ')}`);
-  lines.push(`Persona mode: ${profile.persona_preference}`);
-  lines.push(`Session count: ${profile.session_count}`);
-  lines.push('[End of profile context]\n');
-  return lines.join('\n');
+  let context = `[USER CONTEXT]\n`;
+  context += `User Name: ${profile.name || profile.user_name || 'Ajinkya'}\n`;
+  context += `Preferred Salutation: ${salutation}\n`;
+  if (profile.occupation) context += `Occupation: ${profile.occupation}\n`;
+  if (profile.dob) context += `Date of Birth: ${profile.dob}\n`;
+  if (profile.interests?.length) context += `Interests: ${profile.interests.join(', ')}\n`;
+  context += `\n`;
+  return context;
 }
 
 // ── Extract profile data from a message using the AI ─────────────────────────
 // This runs in the background after each user message
 export async function extractProfileFromMessage(userMessage, currentProfile, model = 'llama3.2') {
+  // 1. Fast regex extraction (always wins on simple patterns)
+  const regexData = extractByRegex(userMessage);
+  if (Object.keys(regexData).length > 0) {
+    await saveProfile(regexData);
+    // Continue for more complex data if needed, but regexData is already saved
+  }
+
   const prompt = `You are an AI that extracts personal information from user messages.
 
 Given this user message: "${userMessage}"
@@ -135,16 +173,21 @@ export function trackTopic(profile, topic) {
 export function buildProactiveGreeting(profile) {
   const h    = new Date().getHours();
   const day  = new Date().toLocaleDateString('en-US', { weekday:'long' });
-  const sal  = profile.gender === 'male' ? 'Sir' : profile.gender === 'female' ? 'Ma\'am' : 'Sir'; // Default to Sir if unknown
-  const name = profile?.name ? ` ${profile.name}` : '';
+  
+  // Try to use name from profile, otherwise fallback to "Sir" as a polite default
+  const namePart = profile?.name ? ` ${profile.name}` : '';
+  const sal = profile?.gender === 'female' ? "Ma'am" : "Sir";
+  
+  // If we have a name, we can be more casual/friendly
+  const greetingName = profile?.name ? profile.name : sal;
 
-  if (h >= 5  && h < 9)  return `Good morning, ${sal}${name}! It's ${day} — ready to get started?`;
-  if (h >= 9  && h < 12) return `Hey ${sal}${name}! It's a ${day} morning. What are we working on?`;
-  if (h >= 12 && h < 14) return `Afternoon, ${sal}${name}. Taking a break or diving in?`;
-  if (h >= 14 && h < 17) return `Hey ${sal}${name} — ${day} afternoon. Still on track?`;
-  if (h >= 17 && h < 20) return `Evening, ${sal}${name}. Wrapping up for the day or something on your mind?`;
-  if (h >= 20 && h < 23) return `Late evening, ${sal}${name}. Anything you want to capture before you sleep?`;
-  return `Hey ${sal}${name}, you're up late on ${day}. Something on your mind?`;
+  if (h >= 5  && h < 9)  return `Good morning, ${greetingName}! It's ${day} — ready to get started?`;
+  if (h >= 9  && h < 12) return `Hey ${greetingName}! It's a ${day} morning. What are we working on?`;
+  if (h >= 12 && h < 14) return `Afternoon, ${greetingName}. Taking a break or diving in?`;
+  if (h >= 14 && h < 17) return `Hey ${greetingName} — ${day} afternoon. Still on track?`;
+  if (h >= 17 && h < 20) return `Evening, ${greetingName}. Wrapping up for the day or something on your mind?`;
+  if (h >= 20 && h < 23) return `Late evening, ${greetingName}. Anything you want to capture before you sleep?`;
+  return `Hey ${greetingName}, you're up late on ${day}. Something on your mind?`;
 }
 
 // ── Increment session count ───────────────────────────────────────────────────

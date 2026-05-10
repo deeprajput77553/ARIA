@@ -43,7 +43,9 @@ function playTikTik() {
 // ── Female TTS ──────────────────────────────────────────────────────────────
 export function speakFemale(text, settings) {
   if (!settings?.voiceEnabled) return;
+  // If there's an ongoing speech, cancel it first
   window.speechSynthesis.cancel();
+  
   const utt = new SpeechSynthesisUtterance(text);
   const voices = window.speechSynthesis.getVoices();
   const chosen = settings?.voiceName
@@ -51,10 +53,15 @@ export function speakFemale(text, settings) {
     : voices.find(v => /samantha|victoria|karen|zira|google.*female|female|fiona/i.test(v.name) && v.lang.startsWith('en'))
     || voices.find(v => v.lang.startsWith('en-') && v.default === false)
     || voices.find(v => v.lang.startsWith('en'));
+  
   if (chosen) utt.voice = chosen;
   utt.pitch = settings?.voicePitch ?? 1.15;
   utt.rate = settings?.voiceSpeed ?? 0.95;
   window.speechSynthesis.speak(utt);
+}
+
+export function stopSpeaking() {
+  window.speechSynthesis.cancel();
 }
 
 // ── DNA Canvas ──────────────────────────────────────────────────────────────
@@ -212,7 +219,8 @@ const PremiumLogEntry = ({ entry, role, isOpen, onToggle }) => {
   
   const displayText = isUser 
     ? entry.text 
-    : (entry.text && entry.text.length > 65 ? entry.text.substring(0, 65) + '...' : entry.text) || 'Processing cognitive intent...';
+    : (isOpen ? entry.text : (entry.text && entry.text.length > 65 ? entry.text.substring(0, 65) + '...' : entry.text)) 
+      || 'Processing cognitive intent...';
 
   const handleToggle = () => {
     if (!isUser && entry.steps?.length > 0) {
@@ -266,7 +274,7 @@ const PremiumLogEntry = ({ entry, role, isOpen, onToggle }) => {
               <div key={i} className={`timeline-step ${s.status}`}>
                 <div className="timeline-icon">{getStepIcon(s)}</div>
                 <div className="timeline-content">
-                  <span className="step-label">{s.label}</span>
+                  <span className="step-label">{typeof s.label === 'string' ? s.label : JSON.stringify(s.label)}</span>
                   {s.status === 'running' && <span className="step-running-dot" />}
                 </div>
               </div>

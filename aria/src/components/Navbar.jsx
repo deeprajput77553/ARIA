@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getCurrentName } from '../storage/UserProfile.js';
 
 // The 4-petal star from aria_logo.svg, scaled to fit navbar
 const StarLogo = ({ size = 36 }) => (
@@ -48,6 +49,11 @@ const StarLogo = ({ size = 36 }) => (
 const Navbar = ({ currentPage, onNavigate }) => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const [userName, setUserName] = useState('User');
+
+  useEffect(() => {
+    getCurrentName().then(setUserName);
+  }, []);
 
   const nav = (page) => {
     onNavigate(page);
@@ -119,11 +125,11 @@ const Navbar = ({ currentPage, onNavigate }) => {
             </svg>
           </div>
           <div className="user-status-dot"/>
-          <span className="user-name-small">Ajinkya</span>
+          <span className="user-name-small">{userName}</span>
           {userMenuOpen && (
             <div className="user-dropdown">
               <div className="user-info">
-                <span className="user-name">Ajinkya</span>
+                <span className="user-name">{userName}</span>
                 <span className="user-role">Admin</span>
               </div>
               <div className="dropdown-divider"/>

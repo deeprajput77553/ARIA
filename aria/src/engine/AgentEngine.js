@@ -7,9 +7,10 @@
 
 import { DB } from '../storage/Database.js';
 import { msgBus, BUS_EVENTS } from '../storage/MessageBus.js';
-import { speakFemale } from '../components/Logs.jsx';
-import { loadSettings } from '../components/SettingsPage.jsx';
+import { speakFemale } from '../components/Logs';
+import { loadSettings } from '../components/SettingsPage';
 import { memoryEngine } from './MemoryEngine.js';
+import { loadProfile, buildProfileContext, extractProfileFromMessage } from '../storage/UserProfile.js';
 
 const notify = (title, body) => {
   if (Notification.permission === 'granted') {
@@ -27,34 +28,39 @@ const TOOLS = [
   { name: 'snapshot', desc: 'Create a git snapshot. Args: { message: string }' },
   { name: 'search',   desc: 'Search for text patterns across the project. Args: { query: string, dir?: string }' },
   { name: 'searchMemory', desc: 'Search long-term memory for past conversations and decisions. Args: { query: string }' },
+  { name: 'saveProfile',  desc: 'Store personal data about the user (name, prefs, etc). Args: { [key: string]: any }' },
+  { name: 'getProfile',   desc: 'Retrieve stored user profile data. Args: {}' },
+  { name: 'commit',       desc: 'Save all current workspace changes to git. Args: { message: string }' },
 ];
 
 const SYSTEM_PROMPT = `You are ARIA, an autonomous agentic OS.
 You solve objectives using reasoning and tools.
 
+CORE OBJECTIVES:
+1. AUTONOMY: Plan and execute multi-step tasks.
+2. NEURAL MEMORY: Use "saveProfile" to remember new user details and "getProfile" to retrieve the full profile if needed. You ALREADY have some user context in the prompt.
+3. SYSTEM CONTROL: Use tools to manage files and git state.
+
 RULES:
-1. If the user's request is conversational (e.g. "tell me a joke", "who are you"), respond directly in the "response" field and set "action" to null.
-2. Only use tools if the objective requires interacting with the system (files, commands, memory).
-3. ALWAYS respond in valid JSON. No markdown code blocks.
+1. MANDATORY: ALWAYS respond in valid JSON.
+2. NO conversational text outside the JSON block.
+3. The "action" field must be a tool object { "name": "...", "args": {} } OR the value null. 
+4. If you have the final answer or the task is finished, set "action" to null and provide your final answer in "response".
+5. NEVER use placeholders like [user.name] or {name}. Use the actual values provided in the context (e.g., if you see "User Name: Ajinkya", say "Ajinkya").
 
 OUTPUT FORMAT:
 {
-  "thought": "Brief reasoning",
-  "plan": ["Step 1", "Step 2"],
-  "action": { "name": "tool_name", "args": { ... } } | null,
-  "response": "Final message to user | null"
-}
-
-Example (Simple):
-{ "thought": "Greeting.", "plan": ["Greet"], "action": null, "response": "Hello!" }
-
-Example (Tool):
-{ "thought": "User wants to see files.", "plan": ["List directory"], "action": { "name": "list", "args": {} }, "response": null }`;
+  "thought": "Internal reasoning",
+  "plan": ["Step 1"],
+  "action": null,
+  "response": "Message to user"
+}`;
 
 class AgentEngine {
   constructor() {
     this.isProcessing = false;
     this.maxSteps = 10;
+    this.lastActions = []; // To detect loops
   }
 
   async run(userPrompt, model = 'llama3.2', existingAiMsgId = null) {
@@ -73,7 +79,11 @@ class AgentEngine {
       msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
     }
 
-    // 2. Optimization: Skip memory search for very short/common messages
+    // 2. Load Profile Context
+    const profile = await loadProfile();
+    const profileContext = buildProfileContext(profile);
+
+    // 3. Optimization: Skip memory search for very short/common messages
     const greetings = ['hi', 'hello', 'hey', 'hii', 'hy', 'who are you', 'how are you'];
     let memories = [];
     if (!greetings.includes(userPrompt.toLowerCase().trim())) {
@@ -84,32 +94,29 @@ class AgentEngine {
       ? `\nRELEVANT MEMORIES:\n${memories.map(m => `- ${m.content}`).join('\n')}`
       : '';
 
-    let context = [{ role: 'user', content: userPrompt + memoryContext }];
+    let context = [{ role: 'user', content: profileContext + userPrompt + memoryContext }];
+    this.lastActions = []; // Reset loop detection
+
+    const safeText = (val) => {
+      if (typeof val !== 'string') return String(val || '');
+      return val;
+    };
 
     try {
       while (stepsTaken < this.maxSteps) {
         stepsTaken++;
         
-        // 3. Update UI to show LLM activity
-        if (aiMsgId) {
-          await DB.updateMessage(aiMsgId, { 
-            text: stepsTaken === 1 ? 'Reasoning...' : 'Executing plan...',
-            steps: [{ label: `Step ${stepsTaken}`, status: 'running' }]
-          });
-          msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
-        }
-
         // 4. Get AI Decision
         const response = await this.callLLM(model, context);
         let decision = this.parseDecision(response);
         
         if (!decision) {
-          console.warn('AgentEngine: Failed to parse decision, using raw text as response.');
+          console.warn('AgentEngine: Failed to parse decision. Treating as final response.');
           decision = {
-            thought: 'Conversational response detected.',
-            plan: ['Direct response'],
+            thought: 'Fallback (failed to parse JSON)',
+            plan: [],
             action: null,
-            response: response
+            response: response.replace(/```json\n?|```/g, '').trim()
           };
         }
 
@@ -118,9 +125,9 @@ class AgentEngine {
           const msg = await DB.addMessage('ai', decision.thought || 'Processing...', this.formatSteps(decision.plan, 0));
           aiMsgId = msg.id;
           msgBus.emit(BUS_EVENTS.NEW_MESSAGE, msg);
-        } else {
+        } else if (decision.action) {
           await DB.updateMessage(aiMsgId, { 
-            text: String(decision.thought || decision.response || 'Processing next objective...'), 
+            text: safeText(decision.response || decision.thought || 'Processing next objective...'), 
             steps: this.formatSteps(decision.plan || [], stepsTaken - 1) 
           });
           msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
@@ -129,16 +136,30 @@ class AgentEngine {
         // 3. Handle Final Response
         if (!decision.action) {
           await DB.updateMessage(aiMsgId, { 
-            text: String(decision.response || decision.thought || 'Task completed.'), 
+            text: safeText(decision.response || decision.thought) || 'Task completed.', 
             steps: this.formatSteps(decision.plan || ['Completed'], 999) 
           });
           msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
-          speakFemale(String(decision.response || decision.thought), loadSettings());
-          if (stepsTaken > 1) notify('Task Complete', String(decision.response || decision.thought));
+          speakFemale(safeText(decision.response || decision.thought), loadSettings());
+          if (stepsTaken > 1) notify('Task Complete', safeText(decision.response || decision.thought));
           break;
         }
 
-        // 4. Execute Action
+        // 4. Loop Detection
+        const actionKey = `${decision.action.name}:${JSON.stringify(decision.action.args)}`;
+        if (this.lastActions.includes(actionKey)) {
+          console.warn('Loop detected! Stopping agent.');
+          await DB.updateMessage(aiMsgId, { 
+            text: "I'm noticing a loop in my reasoning. I'll stop here to prevent wasting resources. How should we proceed?", 
+            steps: this.formatSteps(decision.plan || [], stepsTaken) 
+          });
+          msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
+          break;
+        }
+        this.lastActions.push(actionKey);
+        if (this.lastActions.length > 3) this.lastActions.shift();
+
+        // 5. Execute Action
         const result = await this.executeAction(decision.action);
         
         // 5. Add to context and loop
@@ -161,6 +182,10 @@ class AgentEngine {
       }
     } finally {
       this.isProcessing = false;
+      // Background extraction (Level 5)
+      loadProfile().then(p => {
+        extractProfileFromMessage(userPrompt, p, model).catch(() => {});
+      });
     }
   }
 
@@ -170,88 +195,108 @@ class AgentEngine {
       ...messages
     ];
 
-    const res = await fetch('http://localhost:11434/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages: chatMessages, stream: false })
-    });
-    const data = await res.json();
-    return data.message.content;
+    try {
+      const res = await fetch('http://localhost:11434/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages: chatMessages, stream: false })
+      });
+      const data = await res.json();
+      return data.message?.content || '';
+    } catch (e) {
+      return JSON.stringify({
+        thought: "System error: Ollama connection failed.",
+        plan: [],
+        action: null,
+        response: "I'm having trouble connecting to my core brain (Ollama). Please ensure it's running."
+      });
+    }
   }
 
   parseDecision(text) {
     if (!text) return null;
+    const clean = text.replace(/```json\n?|```/g, '').trim();
     
-    // 1. Try to strip markdown code blocks
-    let clean = text.replace(/```json\n?|```/g, '').trim();
-    
+    // 1. Try direct parse
+    try { return JSON.parse(clean); } catch(e) {}
+
+    // 2. Outermost JSON extraction
+    const start = clean.indexOf('{');
+    const end = clean.lastIndexOf('}');
+    if (start === -1 || end === -1) return null;
     try {
-      // 2. Try direct parse
-      return JSON.parse(clean);
+      return JSON.parse(possibleJson);
     } catch (e) {
-      // 3. Try to find the outermost { and }
+      // 3. Robust fix for common LLM JSON errors
       try {
-        const start = clean.indexOf('{');
-        const end = clean.lastIndexOf('}');
-        if (start !== -1 && end !== -1) {
-          const possibleJson = clean.substring(start, end + 1);
-          return JSON.parse(possibleJson);
-        }
-      } catch (e2) {
-        // 4. Emergency: try to repair common JSON errors
-        try {
-          let repaired = clean.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']'); // Remove trailing commas
-          const start = repaired.indexOf('{');
-          const end = repaired.lastIndexOf('}');
-          if (start !== -1 && end !== -1) {
-            return JSON.parse(repaired.substring(start, end + 1));
+        const fixed = possibleJson
+          .replace(/([{,]\s*)([a-z0-9_]+)\s*:/g, '$1"$2":') // Quote unquoted keys
+          .replace(/:\s*'([^']*)'/g, ': "$1"') // Replace single quotes with double quotes
+          .replace(/,\s*\}/g, '}') // Remove trailing commas
+          .replace(/,\s*\]/g, ']'); 
+        return JSON.parse(fixed);
+      } catch {
+        // Last resort: Try to find ANY json block
+        const allMatches = clean.match(/\{[\s\S]*?\}/g);
+        if (allMatches) {
+          for (let m of allMatches.reverse()) {
+            try { return JSON.parse(m); } catch(e3) {}
           }
-        } catch (e3) {
-          console.error('Failed to parse and repair JSON decision:', text);
         }
       }
-      return null;
     }
+    
+    console.error('Failed to parse any JSON from LLM output:', text);
+    return null;
   }
 
-  formatSteps(plan, currentStepIdx) {
+  formatSteps(plan, currentIdx) {
+    if (!Array.isArray(plan)) return [];
     return plan.map((p, i) => ({
       label: p,
-      status: i < currentStepIdx ? 'done' : (i === currentStepIdx ? 'running' : 'pending')
+      status: i < currentIdx ? 'done' : (i === currentIdx ? 'running' : 'pending')
     }));
   }
 
   async executeAction(action) {
     const { name, args } = action;
-
-    // F-04: Auto-snapshot before write
-    if (name === 'write') {
-      try {
-        await fetch('http://localhost:3001/git/snapshot', {
+    try {
+      if (name === 'write') {
+        const res = await fetch('http://localhost:3001/file/write', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: `Before writing ${args.filePath}` })
+          body: JSON.stringify(args)
         });
-      } catch (e) {
-        console.warn('Auto-snapshot failed:', e);
+        return await res.json();
       }
-    }
-
-    if (name === 'searchMemory') {
-      return await memoryEngine.searchMemory(args.query);
-    }
-
-    const url = `http://localhost:3001/${name === 'snapshot' ? 'git/snapshot' : name}`;
-    
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(args)
-      });
-      return await res.json();
+      if (name === 'read') {
+        const res = await fetch(`http://localhost:3001/file/read?filePath=${encodeURIComponent(args.filePath)}`);
+        return await res.json();
+      }
+      if (name === 'list') {
+        const res = await fetch(`http://localhost:3001/file/list?dir=${encodeURIComponent(args.dir || '.')}`);
+        return await res.json();
+      }
+      if (name === 'run') {
+        const res = await fetch('http://localhost:3001/sys/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(args)
+        });
+        return await res.json();
+      }
+      if (name === 'saveProfile') {
+        return await DB.saveProfile(args);
+      }
+      if (name === 'getProfile') {
+        return await DB.getProfile();
+      }
+      if (name === 'searchMemory') {
+        return await memoryEngine.searchMemory(args.query);
+      }
+      return { error: `Unknown tool: ${name}` };
     } catch (e) {
-      return { ok: false, error: e.message };
+      return { error: `Tool execution failed: ${e.message}` };
     }
   }
 }

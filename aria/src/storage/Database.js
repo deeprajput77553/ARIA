@@ -98,9 +98,21 @@ export const DB = {
   
   // Profile
   async getProfile() { return tx('user_profile', 'readonly', s => s.get('main')); },
-  async saveProfile(p) { return tx('user_profile', 'readwrite', s => s.put({ id: 'main', ...p })); },
+  async saveProfile(updates) {
+    const existing = await this.getProfile() || { id: 'main' };
+    return tx('user_profile', 'readwrite', s => s.put({ ...existing, ...updates, updatedAt: Date.now() }));
+  },
 
   // Audit
   async logAudit(entry) { return tx('audit_log', 'readwrite', s => s.put({ id: Date.now(), ...entry, timestamp: Date.now() })); },
-  async getAuditLog() { return tx('audit_log', 'readonly', s => s.getAll()); }
+  async getAuditLog() { return tx('audit_log', 'readonly', s => s.getAll()); },
+
+  // Tasks
+  async getTasks(status = null) {
+    const all = await tx('tasks', 'readonly', s => s.getAll());
+    return status ? all.filter(t => t.status === status) : all;
+  },
+  async putTask(task) { 
+    return tx('tasks', 'readwrite', s => s.put({ id: task.id || Date.now(), ...task, created_at: task.created_at || Date.now() })); 
+  }
 };
