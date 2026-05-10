@@ -7,7 +7,7 @@
 
 import { DB } from '../storage/Database.js';
 import { msgBus, BUS_EVENTS } from '../storage/MessageBus.js';
-import { speakFemale } from '../components/Logs';
+import { speak as speakFemale } from '../utils/voice';
 import { loadSettings } from '../components/SettingsPage';
 import { memoryEngine } from './MemoryEngine.js';
 import { loadProfile, buildProfileContext, extractProfileFromMessage } from '../storage/UserProfile.js';

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { loadSettings } from './SettingsPage';
 import { DB } from '../storage/Database.js';
 import { msgBus, BUS_EVENTS } from '../storage/MessageBus.js';
-import { speakFemale, stopSpeaking } from './Logs';
+import { speak as speakFemale, stopSpeaking } from '../utils/voice';
 import { useOllama } from '../hooks/useOllama';
 import { agentEngine } from '../engine/AgentEngine';
 

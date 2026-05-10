@@ -40,29 +40,9 @@ function playTikTik() {
   } catch { }
 }
 
-// ── Female TTS ──────────────────────────────────────────────────────────────
-export function speakFemale(text, settings) {
-  if (!settings?.voiceEnabled) return;
-  // If there's an ongoing speech, cancel it first
-  window.speechSynthesis.cancel();
-  
-  const utt = new SpeechSynthesisUtterance(text);
-  const voices = window.speechSynthesis.getVoices();
-  const chosen = settings?.voiceName
-    ? voices.find(v => v.name === settings.voiceName)
-    : voices.find(v => /samantha|victoria|karen|zira|google.*female|female|fiona/i.test(v.name) && v.lang.startsWith('en'))
-    || voices.find(v => v.lang.startsWith('en-') && v.default === false)
-    || voices.find(v => v.lang.startsWith('en'));
-  
-  if (chosen) utt.voice = chosen;
-  utt.pitch = settings?.voicePitch ?? 1.15;
-  utt.rate = settings?.voiceSpeed ?? 0.95;
-  window.speechSynthesis.speak(utt);
-}
+import { speak, stopSpeaking } from '../utils/voice';
 
-export function stopSpeaking() {
-  window.speechSynthesis.cancel();
-}
+export { speak as speakFemale, stopSpeaking };
 
 // ── DNA Canvas ──────────────────────────────────────────────────────────────
 const DNAHelixCanvas = () => {
@@ -288,6 +268,9 @@ const PremiumLogEntry = ({ entry, role, isOpen, onToggle }) => {
 
 // ── Logs Page (Unified Scrolling Architecture) ───────────────────────────────
 const Logs = () => {
+  const [msgs, setMsgs] = useState([]);
+  const [expandedId, setExpandedId] = useState(null);
+  const scrollRef = useRef(null);
   const [showSystemEvents, setShowSystemEvents] = useState(false);
   const [auditLogs, setAuditLogs] = useState([]);
 

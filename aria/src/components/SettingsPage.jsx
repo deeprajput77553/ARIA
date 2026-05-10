@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AriaStore, FILE_TYPE, startAutoSave, stopAutoSave, runAutoSave } from '../storage/AriaStore';
+import { speak, stopSpeaking } from '../utils/voice';
 
 const DEFAULTS = {
   voiceEnabled: true,
@@ -55,15 +56,7 @@ const SettingsPage = () => {
   };
 
   const testVoice = () => {
-    window.speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance("Hello, I am ARIA, your personal AI assistant.");
-    const chosenVoice = voices.find(v => v.name === settings.voiceName) ||
-      voices.find(v => /samantha|victoria|karen|zira|google.*female|female/i.test(v.name)) ||
-      voices.find(v => v.lang.startsWith('en'));
-    if (chosenVoice) utt.voice = chosenVoice;
-    utt.pitch = settings.voicePitch;
-    utt.rate  = settings.voiceSpeed;
-    window.speechSynthesis.speak(utt);
+    speak("Hello, I am ARIA, your personal AI assistant.", settings);
   };
 
   const requestStoragePermission = async () => {
