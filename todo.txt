@@ -1,0 +1,95 @@
+Restoration Summary:
+Core Engines Restored:
+AgentEngine.js: Re-implemented the multi-step reasoning and tool execution pipeline.
+ProactiveEngine.js: Re-enabled the autonomous background checks and greeting system.
+MemoryEngine.js: Re-instated the foundation for semantic memory and consolidation.
+Infrastructure & Hooks:
+useOllama.js: Re-created the centralized hook to manage local LLM connections reliably.
+Database.js: Re-added all critical methods for user profile persistence and audit logging.
+UI & Experience:
+Dashboard.jsx: Fully restored the Cognitive Dashboard with real-time stats and the Personal Data Store.
+Navbar.jsx: Re-integrated the Dashboard link and star icon.
+Orb.jsx: Re-applied the robust refactor for voice recognition and agent interaction.
+Persistent Identity:
+UserProfile.js: Re-implemented the regex extraction patterns and the background Level-5 extraction process.
+ARIA is now back to its most stable, powerful state. You can once again tell her your name or birthday, and she will store them in the Dashboard and recall them in conversation.
+
+
+
+
+
+I have fixed the remaining bugs with the Orb's responsiveness and the data storage reliability.
+
+The Fixes
+Orb Reliability:
+
+The Orb was occasionally failing to process voice commands because its internal "start" and "stop" listeners were conflicting with each other.
+I have refactored Orb.jsx to use a clean, single-pass event system. It now captures your voice accurately and hands it over to the Agent Engine every time without getting stuck.
+Data Persistence Fix:
+
+I discovered a silent "ReferenceError" in the profile engine. Every time ARIA tried to save a new fact about you (like your birthday), it was crashing internally because it couldn't find the "Message Bus" it needed to notify the rest of the system.
+I fixed this import error, and now Neural Memory is fully operational. Facts you share will now stick in the database permanently.
+Reactive Dashboard:
+
+Previously, the Dashboard only loaded your data once when you opened the page.
+I have made the Cognitive Dashboard reactive. Now, as soon as you tell ARIA a new detail (like "my job is a designer"), you will see the Dashboard update in real-time in the background!
+Try it now:
+Open the Orb and click it to speak.
+Say: "Hey ARIA, I live in New York and I love playing chess."
+Go to the Dashboard—you should see these new traits listed instantly in your Personal Data Store.
+
+
+
+The "plain white screen" usually indicates a React runtime error or a mismatch in how files are being imported.
+
+I have standardized the imports across all core files (removing .jsx extensions where they could cause confusion) and verified that all centralized hooks are correctly connected.
+
+3 Things to Check Immediately:
+Check the URL: Your latest terminal output shows that Vite has moved to http://localhost:5174/ because port 5173 was busy. If you are looking at the old tab (5173), it will be a white screen or non-responsive. Please open: 👉 http://localhost:5174/
+
+Open Browser Console: Press F12 (or Ctrl+Shift+I) and look at the Console tab. If there is a red error message, it will tell us exactly which line is failing.
+
+HMR Stability: I moved the useOllama hook to a separate file to prevent Vite from "invalidating" the component. This should keep the screen from going white during code updates.
+
+I have also improved the Agent Engine and Proactive Engine to be more resilient to background errors. ARIA should now load smoothly on port 5174.
+
+
+
+
+ave resolved the issues with the Orb's responsiveness and the Neural Profile's persistence.
+
+Key Improvements
+Orb Interactivity Fixed:
+
+The "Orb not responding properly" was caused by a technical conflict in how the AI hook was being exported. This triggered a Vite HMR error which broke the component's internal state.
+I have moved the useOllama logic to a dedicated file (src/hooks/useOllama.js). This resolves the "Fast Refresh" error and restores full interactivity to the Orb.
+Date of Birth & Profile Persistence:
+
+Even though the AI "knew" your birthday, it wasn't always calling the saveProfile tool. I have added a Regex Pattern for Date of Birth to the UserProfile.js extraction engine.
+Now, as soon as you say "my date of birth is...", the system will capture and save it instantly without needing a complex reasoning step.
+JSON Parsing Hardening:
+
+I cleaned up and restored AgentEngine.js to ensure that even if the AI sends "messy" JSON, the engine can still extract the core message. This prevents the "raw code" responses you saw in your chats.
+Dashboard Visual Hints:
+
+Updated the Dashboard to provide clearer hints when the profile is empty, encouraging more natural interaction to build your digital identity.
+Next Step for You
+Refresh your browser and try saying: "My birthday is August 30th, 2006." to the Orb or Chat. You should see it update immediately in the Dashboard under the Personal Data Store.
+
+
+I have implemented the core logic from your MY_AI app to solve the personal data storage issues in ARIA.
+
+The "Magic" Profile Fix
+Inspired by your MY_AI app, I have introduced a dual-layer extraction system in UserProfile.js:
+
+Regex-Based Extraction (Fast & Reliable): ARIA now uses high-speed pattern matching (Regex) to instantly catch common phrases like "my name is...", "I live in...", or "I work as...". This ensures that basic facts are saved instantly without waiting for the AI to process them.
+Background Intelligence (Level 5 Workflow): I have enabled the background profile extraction in the AgentEngine. After every message you send, ARIA now quietly analyzes the conversation for new personal facts, interests, or project details to add to your Neural Profile.
+Dynamic Navbar: I updated the Navbar to pull directly from this live profile, so as soon as you tell ARIA your name, you'll see it update in the sidebar.
+Stability Fixes
+Proactive Engine Restored: I completely re-wrote src/engine/ProactiveEngine.js from scratch to ensure there are no hidden syntax errors. This resolves the Unexpected token error that was crashing Vite.
+Database Reliability: Verified that Database.js is correctly handling the user_profile store with the latest transactional logic.
+How to test it
+Open the Chat or Orb.
+Say: "Hey ARIA, my name is Ajinkya and I'm a developer from Mumbai."
+Check the Dashboard or look at the Navbar—your name and details should be captured instantly!
+Everything is now running on the standard Vite port (5173) with a much more robust data-store pipeline.

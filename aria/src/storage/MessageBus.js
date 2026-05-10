@@ -42,4 +42,5 @@ export const BUS_EVENTS = {
   STEP_UPDATE:      'step_update',       
   SANDBOX_EVENT:    'sandbox_event',     
   PROFILE_UPDATED:  'profile_updated',
+  AGENT_STATUS:     'agent_status',
 };

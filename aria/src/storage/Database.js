@@ -102,6 +102,13 @@ export const DB = {
     const existing = await this.getProfile() || { id: 'main' };
     return tx('user_profile', 'readwrite', s => s.put({ ...existing, ...updates, updatedAt: Date.now() }));
   },
+  async deleteProfileKey(key) {
+    const existing = await this.getProfile();
+    if (existing) {
+      delete existing[key];
+      return tx('user_profile', 'readwrite', s => s.put({ ...existing, updatedAt: Date.now() }));
+    }
+  },
 
   // Audit
   async logAudit(entry) { return tx('audit_log', 'readwrite', s => s.put({ id: Date.now(), ...entry, timestamp: Date.now() })); },

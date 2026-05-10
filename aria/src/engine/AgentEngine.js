@@ -66,6 +66,7 @@ class AgentEngine {
   async run(userPrompt, model = 'llama3.2', existingAiMsgId = null) {
     if (this.isProcessing) throw new Error('Agent already busy');
     this.isProcessing = true;
+    msgBus.emit(BUS_EVENTS.AGENT_STATUS, { status: 'busy', action: 'Thinking...' });
 
     let aiMsgId = existingAiMsgId;
     let stepsTaken = 0;
@@ -107,6 +108,7 @@ class AgentEngine {
         stepsTaken++;
         
         // 4. Get AI Decision
+        msgBus.emit(BUS_EVENTS.AGENT_STATUS, { status: 'busy', action: 'Reasoning...' });
         const response = await this.callLLM(model, context);
         let decision = this.parseDecision(response);
         
@@ -140,6 +142,7 @@ class AgentEngine {
             steps: this.formatSteps(decision.plan || ['Completed'], 999) 
           });
           msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
+          msgBus.emit(BUS_EVENTS.AGENT_STATUS, { status: 'idle' });
           speakFemale(safeText(decision.response || decision.thought), loadSettings());
           if (stepsTaken > 1) notify('Task Complete', safeText(decision.response || decision.thought));
           break;
@@ -154,12 +157,14 @@ class AgentEngine {
             steps: this.formatSteps(decision.plan || [], stepsTaken) 
           });
           msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
+          msgBus.emit(BUS_EVENTS.AGENT_STATUS, { status: 'error', action: 'Loop detected' });
           break;
         }
         this.lastActions.push(actionKey);
         if (this.lastActions.length > 3) this.lastActions.shift();
 
         // 5. Execute Action
+        msgBus.emit(BUS_EVENTS.AGENT_STATUS, { status: 'busy', action: `Executing: ${decision.action.name}` });
         const result = await this.executeAction(decision.action);
         
         // 5. Add to context and loop
@@ -172,10 +177,12 @@ class AgentEngine {
             steps: this.formatSteps(decision.plan || [], stepsTaken) 
           });
           msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
+          msgBus.emit(BUS_EVENTS.AGENT_STATUS, { status: 'idle' });
         }
       }
     } catch (err) {
       console.error('Agent Loop Error:', err);
+      msgBus.emit(BUS_EVENTS.AGENT_STATUS, { status: 'error', action: err.message });
       if (aiMsgId) {
         await DB.updateMessage(aiMsgId, { text: `⚠ Error: ${err.message}`, steps: [{ label: 'Error', status: 'error' }] });
         msgBus.emit(BUS_EVENTS.UPDATE_MESSAGE);
@@ -224,6 +231,7 @@ class AgentEngine {
     const start = clean.indexOf('{');
     const end = clean.lastIndexOf('}');
     if (start === -1 || end === -1) return null;
+    const possibleJson = clean.substring(start, end + 1);
     try {
       return JSON.parse(possibleJson);
     } catch (e) {
@@ -261,41 +269,53 @@ class AgentEngine {
   async executeAction(action) {
     const { name, args } = action;
     try {
+      let result;
       if (name === 'write') {
         const res = await fetch('http://localhost:3001/file/write', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(args)
         });
-        return await res.json();
-      }
-      if (name === 'read') {
+        result = await res.json();
+      } else if (name === 'read') {
         const res = await fetch(`http://localhost:3001/file/read?filePath=${encodeURIComponent(args.filePath)}`);
-        return await res.json();
-      }
-      if (name === 'list') {
+        result = await res.json();
+      } else if (name === 'list') {
         const res = await fetch(`http://localhost:3001/file/list?dir=${encodeURIComponent(args.dir || '.')}`);
-        return await res.json();
-      }
-      if (name === 'run') {
+        result = await res.json();
+      } else if (name === 'run') {
         const res = await fetch('http://localhost:3001/sys/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(args)
         });
-        return await res.json();
+        result = await res.json();
+      } else if (name === 'saveProfile') {
+        result = await DB.saveProfile(args);
+      } else if (name === 'getProfile') {
+        result = await DB.getProfile();
+      } else if (name === 'searchMemory') {
+        result = await memoryEngine.searchMemory(args.query);
+      } else {
+        result = { error: `Unknown tool: ${name}` };
       }
-      if (name === 'saveProfile') {
-        return await DB.saveProfile(args);
-      }
-      if (name === 'getProfile') {
-        return await DB.getProfile();
-      }
-      if (name === 'searchMemory') {
-        return await memoryEngine.searchMemory(args.query);
-      }
-      return { error: `Unknown tool: ${name}` };
+
+      await DB.logAudit({
+        event_type: 'tool_execution',
+        initiated_by: 'ai',
+        action_description: `Executed tool: ${name}`,
+        outcome: result.error ? 'failure' : 'success',
+        details: JSON.stringify(args)
+      });
+      return result;
     } catch (e) {
+      await DB.logAudit({
+        event_type: 'tool_execution',
+        initiated_by: 'ai',
+        action_description: `Failed tool: ${name}`,
+        outcome: 'error',
+        details: e.message
+      });
       return { error: `Tool execution failed: ${e.message}` };
     }
   }

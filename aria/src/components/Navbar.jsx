@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getCurrentName } from '../storage/UserProfile.js';
+import { msgBus, BUS_EVENTS } from '../storage/MessageBus.js';
 
 // The 4-petal star from aria_logo.svg, scaled to fit navbar
 const StarLogo = ({ size = 36 }) => (
@@ -50,9 +51,14 @@ const Navbar = ({ currentPage, onNavigate }) => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [userName, setUserName] = useState('User');
+  const [agentBusy, setAgentBusy] = useState(false);
 
   useEffect(() => {
     getCurrentName().then(setUserName);
+    const unsub = msgBus.on(BUS_EVENTS.AGENT_STATUS, (p) => {
+      setAgentBusy(p.status === 'busy');
+    });
+    return unsub;
   }, []);
 
   const nav = (page) => {
@@ -64,7 +70,10 @@ const Navbar = ({ currentPage, onNavigate }) => {
     <nav className={`navbar ${isCollapsed ? 'collapsed' : 'expanded'}`}>
       <div className="navbar-top">
         <div className="navbar-logo" onClick={() => nav('orb')}>
-          <StarLogo size={34} />
+          <div className="star-container">
+            <StarLogo size={34} />
+            {agentBusy && <div className="logo-pulse" />}
+          </div>
           <span className="navbar-title" style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '0.05em' }}>ARIA</span>
         </div>
         
@@ -124,13 +133,13 @@ const Navbar = ({ currentPage, onNavigate }) => {
               <path d="M6 28c0-5.523 4.477-10 10-10s10 4.477 10 10" fill="rgba(255,255,255,0.85)"/>
             </svg>
           </div>
-          <div className="user-status-dot"/>
+          <div className={`user-status-dot ${agentBusy ? 'busy' : 'online'}`}/>
           <span className="user-name-small">{userName}</span>
           {userMenuOpen && (
             <div className="user-dropdown">
               <div className="user-info">
                 <span className="user-name">{userName}</span>
-                <span className="user-role">Admin</span>
+                <span className="user-role">System Operator</span>
               </div>
               <div className="dropdown-divider"/>
               <button className="dropdown-item" onClick={() => nav('settings')}>Settings</button>
@@ -139,6 +148,21 @@ const Navbar = ({ currentPage, onNavigate }) => {
           )}
         </div>
       </div>
+
+      <style>{`
+        .star-container { position: relative; display: flex; align-items: center; justify-content: center; }
+        .logo-pulse {
+          position: absolute; width: 40px; height: 40px;
+          border: 2px solid #a855f7; border-radius: 50%;
+          animation: logo-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+        @keyframes logo-ping {
+          0% { transform: scale(0.8); opacity: 1; }
+          100% { transform: scale(1.5); opacity: 0; }
+        }
+        .user-status-dot.busy { background: #a855f7; box-shadow: 0 0 8px #a855f7; }
+        .user-status-dot.online { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+      `}</style>
     </nav>
   );
 };

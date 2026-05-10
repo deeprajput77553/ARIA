@@ -7,7 +7,7 @@ import { agentEngine } from '../engine/AgentEngine';
 import { useOllama } from '../hooks/useOllama';
 import { DB } from '../storage/Database.js';
 
-// ─── SHADERS (Truncated for brevity, assuming they remain the same) ──────────
+// ─── SHADERS ───────────────────────────────────────────────────────────────
 const vertexShader = `
   varying vec2 vUv;
   varying vec3 vPosition;
@@ -72,8 +72,8 @@ const vertexShader = `
     if (uState == 1.0) {
       distortion += snoise(noisePos * 2.0) * 0.4 * uAudioData;
     } else if (uState == 2.0) {
-      distortion += sin(position.y * 10.0 + uTime * 5.0) * 0.15 * uAudioData;
-      distortion += snoise(noisePos * 3.0) * 0.2 * uAudioData;
+      distortion += sin(position.y * 10.0 + uTime * 5.0) * 0.15;
+      distortion += snoise(noisePos * 3.0) * 0.2;
     }
     vec3 newPosition = position + normal * distortion;
     vPosition = newPosition;
@@ -87,7 +87,6 @@ const fragmentShader = `
   varying vec3 vNormal;
   uniform float uTime;
   uniform float uState;
-  uniform float uTransition;
 
   void main() {
     vec3 colorDark  = vec3(0.08, 0.0, 0.45);
@@ -149,7 +148,7 @@ const layerFragmentShader = `
 `;
 
 // ─── ORB COMPONENT ─────────────────────────────────────────────────────────
-const Orb = ({ onStateChange }) => {
+const Orb = ({ onNavigate }) => {
   const mountRef = useRef(null);
   const orbStateRef = useRef(0); // 0=idle, 1=listen, 2=speak
   const uniformsRef = useRef(null);
@@ -172,8 +171,20 @@ const Orb = ({ onStateChange }) => {
     if (midUniformsRef.current) midUniformsRef.current.uState.value = s;
     if (innerUniformsRef.current) innerUniformsRef.current.uState.value = s;
     if (shellRef.current) shellRef.current.material.opacity = s === 0 ? 0.1 : 0.05;
-    onStateChange?.(s);
-  }, [onStateChange]);
+  }, []);
+
+  useEffect(() => {
+    const unsub = msgBus.on(BUS_EVENTS.AGENT_STATUS, (p) => {
+      if (p.status === 'busy') {
+        setOrbState(2);
+        setStatusText(p.action || 'Thinking...');
+      } else if (p.status === 'idle') {
+        setOrbState(0);
+        setStatusText('Tap to speak');
+      }
+    });
+    return unsub;
+  }, [setOrbState]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
@@ -224,7 +235,6 @@ const Orb = ({ onStateChange }) => {
         setResponse('');
         setShowResponse(true);
 
-        // Save messages and run agent
         const userMsg = await DB.addMessage('user', text);
         msgBus.emit(BUS_EVENTS.NEW_MESSAGE, userMsg);
 
@@ -236,11 +246,6 @@ const Orb = ({ onStateChange }) => {
 
         try {
           await agentEngine.run(text, model, aiMsg.id);
-          setStatusText('Done — tap again');
-          setTimeout(() => {
-            setOrbState(0);
-            setStatusText('Tap to speak');
-          }, 3000);
         } catch (err) {
           setStatusText('Agent error');
           setOrbState(0);
@@ -252,7 +257,6 @@ const Orb = ({ onStateChange }) => {
     };
 
     rec.onerror = (e) => {
-      console.error('Speech error:', e.error);
       setIsListening(false);
       setOrbState(0);
       setStatusText(`Error: ${e.error}`);
@@ -267,9 +271,9 @@ const Orb = ({ onStateChange }) => {
     else if (orbStateRef.current === 0) startListening();
   };
 
-  // ── Three.js scene ──────────────────────────────────────────────────────
   useEffect(() => {
     const container = mountRef.current;
+    if (!container) return;
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
     camera.position.z = 5;
@@ -282,8 +286,7 @@ const Orb = ({ onStateChange }) => {
     const uniforms = {
       uTime: { value: 0 },
       uState: { value: 0 },
-      uAudioData: { value: 0 },
-      uTransition: { value: 0 }
+      uAudioData: { value: 0 }
     };
     uniformsRef.current = uniforms;
 
@@ -292,25 +295,12 @@ const Orb = ({ onStateChange }) => {
     const orb = new THREE.Mesh(geo, mat);
     scene.add(orb);
 
-    // Layer 1
     const mUniforms = { uTime: { value: 0 }, uState: { value: 0 }, uColor: { value: 1.0 } };
     midUniformsRef.current = mUniforms;
     const mGeo = new THREE.IcosahedronGeometry(2.1, 32);
     const mMat = new THREE.ShaderMaterial({ vertexShader, fragmentShader: layerFragmentShader, uniforms: mUniforms, transparent: true, blending: THREE.AdditiveBlending });
     const mMesh = new THREE.Mesh(mGeo, mMat);
     scene.add(mMesh);
-
-    // Shell
-    const sGeo = new THREE.SphereGeometry(3, 32, 32);
-    const sMat = new THREE.MeshPhongMaterial({ color: 0x7c3aed, transparent: true, opacity: 0.1, side: THREE.BackSide });
-    const shell = new THREE.Mesh(sGeo, sMat);
-    shellRef.current = shell;
-    scene.add(shell);
-
-    const light = new THREE.PointLight(0xffffff, 1);
-    light.position.set(5, 5, 5);
-    scene.add(light);
-    scene.add(new THREE.AmbientLight(0x404040));
 
     const animate = (t) => {
       uniforms.uTime.value = t * 0.001;
@@ -330,45 +320,24 @@ const Orb = ({ onStateChange }) => {
     window.addEventListener('resize', handleResize);
     return () => {
       window.removeEventListener('resize', handleResize);
-      container.removeChild(renderer.domElement);
+      if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
     };
   }, []);
 
   return (
     <div className="orb-page">
       <div className="orb-mount" ref={mountRef} onClick={handleOrbClick} />
-      
       <div className="orb-ui">
         <div className={`orb-status ${isListening ? 'active' : ''}`}>{statusText}</div>
-        
         {transcript && <div className="orb-transcript">"{transcript}"</div>}
-
-        {showResponse && (
-          <div className="orb-response-card premium-scroll">
-            <div className="response-header">ARIA RESPONSE</div>
-            <div className="response-text">{response || '...'}</div>
-          </div>
-        )}
       </div>
-
       <style>{`
         .orb-page { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; }
-        .orb-mount { width: 100%; height: 100%; cursor: pointer; transition: transform 0.3s ease; }
-        .orb-mount:hover { transform: scale(1.02); }
-        
-        .orb-ui { position: absolute; bottom: 80px; display: flex; flex-direction: column; align-items: center; gap: 20px; pointer-events: none; width: 100%; max-width: 600px; padding: 0 40px; }
-        
+        .orb-mount { width: 100%; height: 100%; cursor: pointer; }
+        .orb-ui { position: absolute; bottom: 80px; display: flex; flex-direction: column; align-items: center; gap: 20px; pointer-events: none; }
         .orb-status { font-family: 'Outfit', sans-serif; font-size: 14px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.4); }
         .orb-status.active { color: #a78bfa; text-shadow: 0 0 10px rgba(167,139,250,0.5); }
-        
         .orb-transcript { font-family: 'Inter', sans-serif; font-size: 18px; color: white; text-align: center; font-style: italic; opacity: 0.8; }
-        
-        .orb-response-card { background: rgba(13,10,31,0.85); backdrop-filter: blur(20px); border: 1px solid rgba(167,139,250,0.2); border-radius: 24px; padding: 24px; width: 100%; max-height: 200px; overflow-y: auto; pointer-events: auto; box-shadow: 0 20px 50px rgba(0,0,0,0.5); animation: card-slide 0.5s cubic-bezier(0.16,1,0.3,1) both; }
-        
-        @keyframes card-slide { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .response-header { font-size: 10px; font-weight: 800; color: #a78bfa; letter-spacing: 0.1em; margin-bottom: 8px; }
-        .response-text { font-size: 16px; line-height: 1.6; color: white; }
       `}</style>
     </div>
   );

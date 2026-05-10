@@ -7,6 +7,7 @@ import Chat from './components/Chat';
 import Dashboard from './components/Dashboard';
 import AuthPage from './components/AuthPage';
 import SettingsPage from './components/SettingsPage';
+import GlobalAgentState from './components/GlobalAgentState';
 import { proactiveEngine } from './engine/ProactiveEngine';
 import './App.css';
 
@@ -43,6 +44,7 @@ function App() {
         {screen === 'logs'     && <Logs/>}
         {screen === 'dashboard' && <Dashboard/>}
         {screen === 'settings' && <SettingsPage/>}
+        <GlobalAgentState />
       </main>
     </div>
   );

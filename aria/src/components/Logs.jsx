@@ -288,13 +288,24 @@ const PremiumLogEntry = ({ entry, role, isOpen, onToggle }) => {
 
 // ── Logs Page (Unified Scrolling Architecture) ───────────────────────────────
 const Logs = () => {
-  const [msgs, setMsgs] = useState([]);
-  const [expandedId, setExpandedId] = useState(null);
-  const scrollRef = useRef(null);
+  const [showSystemEvents, setShowSystemEvents] = useState(false);
+  const [auditLogs, setAuditLogs] = useState([]);
 
   const refresh = useCallback(async () => {
     const data = await DB.getMessages();
-    setMsgs(data.sort((a, b) => (a.timestamp || a.id) - (b.timestamp || b.id)));
+    const sorted = data.sort((a, b) => (a.timestamp || a.id) - (b.timestamp || b.id));
+    setMsgs(sorted);
+    
+    const audit = await DB.getAuditLog();
+    setAuditLogs(audit.sort((a, b) => (a.timestamp || a.id) - (b.timestamp || b.id)));
+
+    // Auto-expand latest AI message if it has steps
+    if (sorted.length > 0) {
+      const last = sorted[sorted.length - 1];
+      if (last.role === 'ai' && last.steps?.length > 0) {
+        setExpandedId(last.id);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -306,20 +317,33 @@ const Logs = () => {
 
   const interactions = React.useMemo(() => {
     const arr = [];
-    let curr = { user: null, ai: null, id: null };
+    let currentPair = { user: null, ai: null, id: null };
+
     msgs.forEach(m => {
       if (m.role === 'user') {
-        if (curr.user) arr.push(curr);
-        curr = { user: m, ai: null, id: m.id };
+        if (currentPair.user || currentPair.ai) arr.push({ ...currentPair, type: 'chat' });
+        currentPair = { user: m, ai: null, id: m.id, type: 'chat' };
       } else {
-        curr.ai = m;
-        arr.push(curr);
-        curr = { user: null, ai: null, id: m.id };
+        if (currentPair.ai) {
+          arr.push({ ...currentPair, type: 'chat' });
+          currentPair = { user: null, ai: m, id: m.id, type: 'chat' };
+        } else {
+          currentPair.ai = m;
+          currentPair.id = currentPair.id || m.id;
+        }
       }
     });
-    if (curr.user || curr.ai) arr.push(curr);
+    if (currentPair.user || currentPair.ai) arr.push({ ...currentPair, type: 'chat' });
+
+    if (showSystemEvents) {
+      auditLogs.forEach(a => {
+        arr.push({ id: a.id, timestamp: a.timestamp, type: 'audit', data: a });
+      });
+      arr.sort((a, b) => (a.timestamp || a.id) - (b.timestamp || b.id));
+    }
+
     return arr;
-  }, [msgs]);
+  }, [msgs, auditLogs, showSystemEvents]);
 
   const updateFades = useCallback(() => {
     if (!scrollRef.current) return;
@@ -377,6 +401,12 @@ const Logs = () => {
         <div className="logs-footer">
           <div className="scroll-indicator"><div className="scroll-dot" /></div>
           <span>Cognitive Stream</span>
+          <button 
+            className={`system-toggle ${showSystemEvents ? 'active' : ''}`}
+            onClick={() => setShowSystemEvents(!showSystemEvents)}
+          >
+            {showSystemEvents ? 'Hide System Events' : 'Show System Events'}
+          </button>
         </div>
       </div>
 
@@ -389,25 +419,70 @@ const Logs = () => {
       >
         <div className="scroll-padding-top" />
         {interactions.map((interaction, idx) => (
-          <div className="interaction-row" key={interaction.id || idx}>
-            <div className="row-col user-col-item">
-              {interaction.user && <PremiumLogEntry entry={interaction.user} role="user" />}
+          interaction.type === 'audit' ? (
+            <div className="interaction-row audit-row" key={interaction.id}>
+              <div className="audit-event-card">
+                <span className="audit-event-time">{new Date(interaction.timestamp).toLocaleTimeString()}</span>
+                <span className="audit-event-tag">{interaction.data.event_type}</span>
+                <span className="audit-event-text">{interaction.data.action_description}</span>
+              </div>
             </div>
-            <div className="row-col center-gap"></div>
-            <div className="row-col ai-col-item">
-              {interaction.ai && (
-                <PremiumLogEntry 
-                  entry={interaction.ai} 
-                  role="ai" 
-                  isOpen={expandedId === interaction.ai.id}
-                  onToggle={() => setExpandedId(expandedId === interaction.ai.id ? null : interaction.ai.id)}
-                />
-              )}
+          ) : (
+            <div className="interaction-row chat-row" key={interaction.id || idx}>
+              <div className="row-col user-col-item">
+                {interaction.user && <PremiumLogEntry entry={interaction.user} role="user" />}
+              </div>
+              <div className="row-col center-gap"></div>
+              <div className="row-col ai-col-item">
+                {interaction.ai && (
+                  <PremiumLogEntry 
+                    entry={interaction.ai} 
+                    role="ai" 
+                    isOpen={expandedId === interaction.ai.id}
+                    onToggle={() => setExpandedId(expandedId === interaction.ai.id ? null : interaction.ai.id)}
+                  />
+                )}
+              </div>
             </div>
-          </div>
+          )
         ))}
         <div className="scroll-padding-bottom" />
       </div>
+
+      <style>{`
+        .system-toggle {
+          margin-left: 20px;
+          background: rgba(168, 85, 247, 0.1);
+          border: 1px solid rgba(168, 85, 247, 0.2);
+          color: #a855f7;
+          padding: 4px 12px;
+          border-radius: 20px;
+          font-size: 11px;
+          cursor: pointer;
+          transition: all 0.2s;
+          pointer-events: auto;
+        }
+        .system-toggle:hover { background: rgba(168, 85, 247, 0.2); transform: translateY(-1px); }
+        .system-toggle.active { background: #a855f7; color: white; border-color: #a855f7; }
+
+        .audit-row { display: flex; justify-content: center; margin: 10px 0; }
+        .audit-event-card {
+          background: rgba(255,255,255,0.03);
+          border: 1px dashed rgba(255,255,255,0.1);
+          padding: 8px 16px;
+          border-radius: 12px;
+          display: flex;
+          gap: 12px;
+          align-items: center;
+          font-size: 12px;
+        }
+        .audit-event-time { color: rgba(255,255,255,0.3); font-family: monospace; }
+        .audit-event-tag { color: #a855f7; font-weight: 700; text-transform: uppercase; font-size: 10px; }
+        .audit-event-text { color: rgba(255,255,255,0.6); }
+
+        .chat-row { position: relative; }
+        .focused-row { filter: brightness(1.2); }
+      `}</style>
     </div>
   );
 };
