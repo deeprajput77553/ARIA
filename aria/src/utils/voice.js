@@ -1,50 +1,42 @@
-import { loadSettings } from '../components/SettingsPage';
+// Centralized Voice Utility for ARIA
+let currentUtterance = null;
 
-export function stopSpeaking() {
-  window.speechSynthesis.cancel();
-}
+export const speak = (text, settings = {}) => {
+  if (!window.speechSynthesis) return;
 
-export function speak(text, settingsOverride) {
-  const settings = settingsOverride || loadSettings();
-  if (!settings?.voiceEnabled) return;
-  
-  const synth = window.speechSynthesis;
-  synth.cancel();
-  
-  const doSpeak = () => {
-    const utt = new SpeechSynthesisUtterance(text);
-    const voices = synth.getVoices();
-    
-    // 1. Try specified voice
-    let chosen = settings?.voiceName ? voices.find(v => v.name === settings.voiceName) : null;
-    
-    // 2. Fallback to female keywords
-    if (!chosen) {
-      chosen = voices.find(v => 
-        /samantha|victoria|karen|zira|google.*female|female|fiona|moira|tessa|veena/i.test(v.name) && 
-        v.lang.startsWith('en')
-      );
-    }
-    
-    // 3. Fallback to any English voice
-    if (!chosen) {
-      chosen = voices.find(v => v.lang.startsWith('en-US')) || voices.find(v => v.lang.startsWith('en'));
-    }
-    
-    if (chosen) utt.voice = chosen;
-    utt.pitch = settings?.voicePitch ?? 1.15;
-    utt.rate = settings?.voiceSpeed ?? 0.95;
-    utt.volume = 1;
-    
-    synth.speak(utt);
+  // Stop any ongoing speech
+  stopSpeaking();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+
+  // Load settings
+  const voiceEnabled = settings.voiceEnabled !== false;
+  if (!voiceEnabled) return;
+
+  // Try to find a high-quality female voice
+  const voices = window.speechSynthesis.getVoices();
+  const preferred = ['Google US English', 'Microsoft Zira', 'Samantha', 'Victoria'];
+  let selectedVoice = voices.find(v => preferred.some(p => v.name.includes(p)));
+
+  if (!selectedVoice) {
+    selectedVoice = voices.find(v => v.name.toLowerCase().includes('female')) || voices[0];
+  }
+
+  if (selectedVoice) utterance.voice = selectedVoice;
+  utterance.rate = settings.voiceRate || 1.0;
+  utterance.pitch = settings.voicePitch || 1.1;
+
+  utterance.onend = () => {
+    currentUtterance = null;
   };
 
-  if (synth.getVoices().length === 0) {
-    synth.onvoiceschanged = () => {
-      synth.onvoiceschanged = null;
-      doSpeak();
-    };
-  } else {
-    doSpeak();
+  currentUtterance = utterance;
+  window.speechSynthesis.speak(utterance);
+};
+
+export const stopSpeaking = () => {
+  if (window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+    currentUtterance = null;
   }
-}
+};

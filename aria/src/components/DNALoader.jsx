@@ -58,11 +58,15 @@ const DNALoader = ({ size = 22, running = true }) => {
 
     const draw = (phi, time) => {
       const spd = speed(time);
-      const trailAlpha = 0.08 + 0.18 * (1 - Math.min(spd/7, 1));
-      gCtx.fillStyle = `rgba(10,10,15,${trailAlpha + 0.55})`;
-      gCtx.fillRect(0,0,S,S);
+      const trailAlpha = 0.12 + 0.15 * (1 - Math.min(spd/7, 1));
+      
+      // Transparent trail effect using destination-out
+      gCtx.globalCompositeOperation = 'destination-out';
+      gCtx.fillStyle = `rgba(255, 255, 255, ${trailAlpha})`;
+      gCtx.fillRect(0, 0, S, S);
+      gCtx.globalCompositeOperation = 'source-over';
 
-      ctx.clearRect(0,0,S,S);
+      ctx.clearRect(0, 0, S, S);
       ctx.save();
       ctx.translate(CX,CY); ctx.rotate(Math.PI/4); ctx.translate(-CX,-CY);
 
